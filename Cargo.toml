@@ -1,0 +1,11 @@
+[package]
+name = "greenrock"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = "0.1.88"
+dotenvy = "0.15.7"
+graph-flow = "0.2.3"
+rig-core = "0.15.1"
+tokio = { version = "1.47.0", features = ["full"] }
