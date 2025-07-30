@@ -1,0 +1,12 @@
+[project]
+name = "greenrock"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ccxt>=4.4.96",
+    "ipython>=9.4.0",
+    "jupyterlab>=4.4.5",
+    "nautilus-trader>=1.219.0",
+]
