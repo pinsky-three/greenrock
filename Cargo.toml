@@ -4,10 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-apca = "0.30.0"
-async-trait = "0.1.88"
 dotenvy = "0.15.7"
 graph-flow = "0.2.3"
-rig-core = "0.15.1"
+rig-core = "0.16.0"
 serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.47.0", features = ["full"] }
+binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
