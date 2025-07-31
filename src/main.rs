@@ -4,9 +4,15 @@
 
 // use num_decimal::Num;
 
-use std::env;
+use std::{env, sync::atomic::AtomicBool};
 
-use binance::{account::Account, api::Binance, market::Market, model::KlineSummary};
+use binance::{
+    account::Account,
+    api::Binance,
+    market::Market,
+    websockets::{WebSockets, WebsocketEvent},
+};
+use chrono::Utc;
 
 // #[tokio::main]
 fn main() {
@@ -100,6 +106,38 @@ fn main() {
         ),
         Err(e) => println!("Error: {:?}", e),
     }
+
+    let keep_running = AtomicBool::new(true); // Used to control the event loop
+    let kline = "btcusdt@kline_1s".to_string();
+
+    let mut now = Utc::now();
+
+    let mut web_socket = WebSockets::new(|event: WebsocketEvent| {
+        if let WebsocketEvent::Kline(kline_event) = event {
+            let current = Utc::now();
+            let diff = current - now;
+            now = current;
+            // println!("diff: {:?}", diff);
+            println!(
+                "Symbol: {}, high: {}, low: {}, diff (ms): {}",
+                kline_event.kline.symbol,
+                kline_event.kline.low,
+                kline_event.kline.high,
+                // kline_event.kline.open,
+                // kline_event.kline.close,
+                // kline_event.kline.open_time,
+                diff.num_milliseconds(),
+            );
+        };
+        Ok(())
+    });
+
+    web_socket.connect(&kline).unwrap(); // check error
+    if let Err(e) = web_socket.event_loop(&keep_running) {
+        println!("Error: {:?}", e);
+    }
+
+    web_socket.disconnect().unwrap();
 }
 
 // use async_trait::async_trait;

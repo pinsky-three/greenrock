@@ -10,3 +10,4 @@ rig-core = "0.16.0"
 serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.47.0", features = ["full"] }
 binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
+chrono = "0.4.41"

@@ -742,6 +742,7 @@ name = "greenrock"
 version = "0.1.0"
 dependencies = [
  "binance",
+ "chrono",
  "dotenvy",
  "graph-flow",
  "rig-core",
