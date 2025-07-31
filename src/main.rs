@@ -66,7 +66,7 @@ impl Starting for MinimalStrategy {
         if let Some(tick) = tick {
             let close = tick.close.parse::<f64>().unwrap();
 
-            println!("{}", close);
+            // println!("{}", close);
         }
 
         (*state).clone()
