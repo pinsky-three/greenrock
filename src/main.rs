@@ -1,7 +1,8 @@
-use std::{any::Any, collections::HashMap};
+use std::{any::Any, collections::HashMap, time::Instant};
 
 use binance::model::Kline;
-use greenrock::processor::load_btc_data;
+use chrono::{Duration, Utc};
+use greenrock::{processor::load_btc_data, utils::row_to_kline};
 use polars::{
     frame::DataFrame,
     prelude::{AnyValue, DataType, IntoLazy, col},
@@ -30,6 +31,7 @@ struct StrategyTrait {
 struct StrategyState {
     data_scope: DataFrame,
     traits: HashMap<String, StrategyTrait>,
+    state: HashMap<String, f64>,
 }
 
 impl Default for StrategyState {
@@ -37,13 +39,14 @@ impl Default for StrategyState {
         Self {
             data_scope: DataFrame::new(vec![]).unwrap(),
             traits: HashMap::new(),
+            state: HashMap::new(),
         }
     }
 }
 
 trait Starting {
     // fn start(&self, state: &StrategyState) -> StrategyState;
-    fn tick(&self, state: &StrategyState, tick: Option<Kline>) -> StrategyState;
+    fn tick(&self, state: &mut StrategyState, tick: Option<Kline>) -> StrategyState;
 }
 
 struct MinimalStrategy {
@@ -56,17 +59,18 @@ impl MinimalStrategy {
             state: StrategyState {
                 data_scope,
                 traits: HashMap::new(),
+                state: HashMap::new(),
             },
         }
     }
 }
 
 impl Starting for MinimalStrategy {
-    fn tick(&self, state: &StrategyState, tick: Option<Kline>) -> StrategyState {
+    fn tick(&self, state: &mut StrategyState, tick: Option<Kline>) -> StrategyState {
         if let Some(tick) = tick {
             let close = tick.close.parse::<f64>().unwrap();
 
-            // println!("{}", close);
+            state.state.insert("close".to_string(), close);
         }
 
         (*state).clone()
@@ -92,63 +96,18 @@ fn main() {
         .collect()
         .unwrap();
 
+    let start = Instant::now();
+
     for i in 0..df.shape().0 {
-        let row = df.get_row(i).unwrap();
-
-        let timestamp = match row.0[0] {
-            AnyValue::Datetime(value, _, _) => value,
-            _ => panic!("Invalid timestamp"),
-        };
-
-        let open = match row.0[1] {
-            AnyValue::String(value) => value.parse::<f64>().unwrap(),
-            _ => panic!("Invalid open"),
-        };
-
-        let high = match row.0[2] {
-            AnyValue::Float64(value) => value,
-            _ => panic!("Invalid high"),
-        };
-
-        let low = match row.0[3] {
-            AnyValue::Float64(value) => value,
-            _ => panic!("Invalid low"),
-        };
-
-        let close = match row.0[4] {
-            AnyValue::Float64(value) => value,
-            _ => panic!("Invalid close"),
-        };
-
-        let volume = match row.0[5] {
-            AnyValue::String(value) => value.parse::<f64>().unwrap(),
-            _ => panic!("Invalid volume"),
-        };
-
-        let tick = Kline {
-            symbol: "BTCUSDT".to_string(),
-            interval: "1m".to_string(),
-            ignore_me: "".to_string(),
-            open_time: timestamp,
-            open: open.to_string(),
-            high: high.to_string(),
-            low: low.to_string(),
-            close: close.to_string(),
-            volume: volume.to_string(),
-            close_time: timestamp,
-            first_trade_id: 0,
-            last_trade_id: 0,
-            number_of_trades: 0,
-            is_final_bar: false,
-            quote_asset_volume: "".to_string(),
-            taker_buy_base_asset_volume: "".to_string(),
-            taker_buy_quote_asset_volume: "".to_string(),
-        };
-
-        strategy.state = strategy.tick(&strategy.state, Some(tick));
+        let tick = row_to_kline(&df, i);
+        strategy.state = strategy.tick(&mut strategy.state.clone(), Some(tick));
     }
 
-    // println!("{}", df.shape().0);
+    println!(
+        "evaluated {} klines in {:.3}s",
+        df.shape().0,
+        start.elapsed().as_secs_f64()
+    );
 
-    println!("{}", strategy.state.data_scope);
+    // println!("{}", strategy.state.data_scope);
 }
