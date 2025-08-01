@@ -14,27 +14,27 @@ pub enum StrategyTraitKind {
 
 #[derive(Clone)]
 pub struct StrategyTrade {
-    id: String,
-    kind: StrategyTraitKind,
-    value: Decimal,
-    start_value: Decimal,
-    end_value: Option<Decimal>,
+    _id: String,
+    _kind: StrategyTraitKind,
+    _value: Decimal,
+    _start_value: Decimal,
+    _end_value: Option<Decimal>,
     // start: DateTime<Utc>,
     // end: DateTime<Utc>,
 }
 
 #[derive(Clone)]
 pub struct StrategyState {
-    data_scope: DataFrame,
-    trades: HashMap<String, StrategyTrade>,
+    _data_scope: DataFrame,
+    _trades: HashMap<String, StrategyTrade>,
     state: HashMap<String, f64>,
 }
 
 impl Default for StrategyState {
     fn default() -> Self {
         Self {
-            data_scope: DataFrame::new(vec![]).unwrap(),
-            trades: HashMap::new(),
+            _data_scope: DataFrame::new(vec![]).unwrap(),
+            _trades: HashMap::new(),
             state: HashMap::new(),
         }
     }
@@ -53,8 +53,8 @@ impl MinimalStrategy {
     pub fn new(data_scope: DataFrame) -> Self {
         Self {
             state: StrategyState {
-                data_scope,
-                trades: HashMap::new(),
+                _data_scope: data_scope,
+                _trades: HashMap::new(),
                 state: HashMap::new(),
             },
         }
