@@ -1275,6 +1275,7 @@ dependencies = [
  "rig-core",
  "rust_decimal",
  "serde",
+ "serde_json",
  "teloxide",
  "tokio",
 ]
