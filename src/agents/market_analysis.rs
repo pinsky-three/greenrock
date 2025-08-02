@@ -1,5 +1,3 @@
-use std::error;
-
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde_json::json;
@@ -12,7 +10,7 @@ pub struct MarketSearchArgs {
     crypto: String,
 }
 
-#[derive(Debug, error)]
+#[derive(Debug, Error)]
 pub enum MarketSearchError {
     //#[error("HTTP request failed: {0}")]
     //HttpRequestFailed(String),
