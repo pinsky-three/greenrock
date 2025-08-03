@@ -109,9 +109,6 @@ impl Task for ReplyGenerationTask {
             .await;
         context.set("answer", answer.clone()).await;
 
-        Ok(TaskResult::new(
-            Some(answer),
-            NextAction::ContinueAndExecute,
-        ))
+        Ok(TaskResult::new(Some(answer), NextAction::End))
     }
 }
