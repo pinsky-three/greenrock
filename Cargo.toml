@@ -8,9 +8,15 @@ dotenvy = "0.15.7"
 graph-flow = "0.2.3"
 rig-core = "0.16.0"
 serde = { version = "1.0.219", features = ["derive"] }
-tokio = { version = "1.47.0", features = ["full"] }
+tokio = { version = "1.47.1", features = ["full"] }
 binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
 chrono = "0.4.41"
-polars = { version = "0.49.1", features = ["lazy", "parquet"] }
+polars = { version = "0.50.0", features = ["lazy", "parquet"] }
 rust_decimal = { version = "1.37.2", features = ["macros"] }
 teloxide = { version = "0.17.0", features = ["macros"] }
+tracing = "0.1.41"
+anyhow = "1.0.98"
+async-trait = "0.1.88"
+axum = "0.8.4"
+uuid = { version = "1.17.0", features = ["v4"] }
+tracing-subscriber = "0.3.19"

@@ -29,7 +29,7 @@ impl Broker for BinanceBroker {
                     .collect()
             }
             Err(e) => {
-                println!("Error: {:?}", e);
+                println!("Error: {e}");
                 HashMap::new()
             }
         }
