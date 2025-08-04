@@ -1,7 +1,8 @@
 use rig::completion::ToolDefinition;
 use rig::tool::Tool;
 use serde_json::json;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
+use thiserror::Error;
 
 pub struct MarketAnalysis;
 
@@ -42,9 +43,5 @@ impl Tool for MarketAnalysis {
     async fn call(&self, args: Self::Args) -> Result<Self::Output, Self::Error> {
         // We'll implement the logic for calling the Binance API next.
         Ok("Binance results".to_string())
-    }
-    
-    fn name(&self) -> String {
-        Self::NAME.to_string()
-    }
+    } 
 }   

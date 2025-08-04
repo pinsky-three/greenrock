@@ -1277,6 +1277,7 @@ dependencies = [
  "serde",
  "serde_json",
  "teloxide",
+ "thiserror 2.0.12",
  "tokio",
 ]
 
