@@ -2,28 +2,54 @@ use askama::Template;
 use async_trait::async_trait;
 use graph_flow::GraphError::TaskExecutionFailed;
 use graph_flow::{Context, MessageRole, NextAction, Task, TaskResult};
+use rig::client::CompletionClient;
 use rig::completion::Chat;
+
 use rig::message::Message;
 use tracing::info;
 
 use anyhow::Result;
-use rig::prelude::*;
+// use rig::prelude::*;
 
-use crate::processor::prompts::main_system::MainSystemPromptTemplate;
+use crate::processor::prompts::main_system::EntryInteractionUserInputTemplate;
 
 pub const MAX_RETRIES: u32 = 3;
 
-pub fn get_llm_agent() -> Result<rig::agent::Agent<rig::providers::openrouter::CompletionModel>> {
+pub fn get_llm_agent(
+    system_prompt: String,
+) -> Result<rig::agent::Agent<rig::providers::openrouter::CompletionModel>> {
     let api_key = std::env::var("OPENROUTER_API_KEY")
         .map_err(|_| anyhow::anyhow!("OPENROUTER_API_KEY not set"))?;
+
     let client = rig::providers::openrouter::Client::new(&api_key);
-    Ok(client.agent("google/gemini-2.0-flash-001").build())
+    // let vector_store = rig::vector_store::in_memory_store::InMemoryVectorStore::default();
+
+    // let a = client
+    //     .extractor::<u32>("google/gemini-2.0-flash-001")
+    //     .build();
+
+    // let f = a.extract("".to_string()).await.unwrap();
+
+    let agent = client
+        .agent("google/gemini-2.0-flash-001")
+        .preamble(&system_prompt)
+        .build();
+
+    Ok(agent)
 }
 
-pub struct ReplyGenerationTask;
+pub struct EntryInteractionTask {
+    system_prompt: String,
+}
+
+impl EntryInteractionTask {
+    pub fn new(system_prompt: String) -> Self {
+        Self { system_prompt }
+    }
+}
 
 #[async_trait]
-impl Task for ReplyGenerationTask {
+impl Task for EntryInteractionTask {
     fn id(&self) -> &str {
         std::any::type_name::<Self>()
     }
@@ -54,8 +80,7 @@ impl Task for ReplyGenerationTask {
         );
 
         // Get the full chat history for conversational memory
-        let history = context.get_all_messages().await;
-        // let chat_history = context.get_chat_history().await;
+        let messages = context.get_all_messages().await;
 
         // chat_history.last_messages(n)
 
@@ -63,7 +88,7 @@ impl Task for ReplyGenerationTask {
         // .map(|m| rig::completion::Message::)
         // .collect();
 
-        let agent = get_llm_agent()
+        let agent = get_llm_agent(self.system_prompt.clone())
             .map_err(|e| TaskExecutionFailed(format!("Failed to initialize LLM agent: {e}")))?;
 
         // let prompt = if history.is_empty() {
@@ -92,19 +117,20 @@ impl Task for ReplyGenerationTask {
 
         let context_json = serde_json::to_string(&context).unwrap();
 
-        let prompt = MainSystemPromptTemplate {
+        let prompt = EntryInteractionUserInputTemplate {
             user_input,
-            history: history.clone(),
+            history: messages.clone(),
             context: context_json,
         }
         .render()
         .unwrap();
 
-        // agent.
+        // let c = context.get_rig_messages().await;
+
         let answer = agent
             .chat(
-                &prompt,
-                history
+                prompt.clone(),
+                messages
                     .iter()
                     .map(|m| match m.role {
                         MessageRole::User => Message::user(m.content.clone()),
@@ -114,7 +140,22 @@ impl Task for ReplyGenerationTask {
                     .collect(),
             )
             .await
-            .map_err(|e| TaskExecutionFailed(format!("LLM chat failed: {e}")))?;
+            .map_err(|e| TaskExecutionFailed(format!("LLM prompt failed: {e}")))?;
+
+        // let answer = agent
+        //     .chat(
+        //         &prompt,
+        //         messages
+        //             .iter()
+        //             .map(|m| match m.role {
+        //                 MessageRole::User => Message::user(m.content.clone()),
+        //                 MessageRole::Assistant => Message::assistant(m.content.clone()),
+        //                 MessageRole::System => Message::assistant(m.content.clone()),
+        //             })
+        //             .collect(),
+        //     )
+        //     .await
+        //     .map_err(|e| TaskExecutionFailed(format!("LLM chat failed: {e}")))?;
 
         info!("Answer generated: {}", answer);
 
@@ -123,6 +164,7 @@ impl Task for ReplyGenerationTask {
         context
             .add_assistant_message(format!("Attempt {}: {}", retry_count + 1, answer))
             .await;
+
         context.set("answer", answer.clone()).await;
 
         Ok(TaskResult::new(Some(answer), NextAction::End))

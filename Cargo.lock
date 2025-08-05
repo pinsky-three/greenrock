@@ -1358,6 +1358,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dashmap",
+ "rig-core 0.13.0",
  "serde",
  "serde_json",
  "sqlx",
@@ -1380,7 +1381,7 @@ dependencies = [
  "dotenvy",
  "graph-flow",
  "polars",
- "rig-core",
+ "rig-core 0.16.0",
  "rust_decimal",
  "serde",
  "serde_json",
@@ -2304,6 +2305,15 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "ordered-float"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -3441,6 +3451,28 @@ dependencies = [
 
 [[package]]
 name = "rig-core"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90771abe32248301b0f95ca4e8a30122e0471b7b778700ca6fd563d3e568e472"
+dependencies = [
+ "as-any",
+ "async-stream",
+ "base64 0.22.1",
+ "bytes",
+ "futures",
+ "glob",
+ "mime_guess",
+ "ordered-float 4.6.0",
+ "reqwest 0.12.22",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "rig-core"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef153d62811728733f5cf5299a0149ce5cf1aa3a7ec1043b3f496a92c6873bc5"
@@ -3452,7 +3484,7 @@ dependencies = [
  "futures",
  "glob",
  "mime_guess",
- "ordered-float",
+ "ordered-float 5.0.0",
  "reqwest 0.12.22",
  "schemars 0.8.22",
  "serde",

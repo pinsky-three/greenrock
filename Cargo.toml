@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 dotenvy = "0.15.7"
-graph-flow = "0.2.3"
+graph-flow = { version = "0.2.3", features = ["rig"] }
 rig-core = "0.16.0"
 serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.47.1", features = ["full"] }
