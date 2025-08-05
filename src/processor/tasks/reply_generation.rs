@@ -1,3 +1,4 @@
+use askama::Template;
 use async_trait::async_trait;
 use graph_flow::GraphError::TaskExecutionFailed;
 use graph_flow::{Context, MessageRole, NextAction, Task, TaskResult};
@@ -7,6 +8,8 @@ use tracing::info;
 
 use anyhow::Result;
 use rig::prelude::*;
+
+use crate::processor::prompts::main_system::MainSystemPromptTemplate;
 
 pub const MAX_RETRIES: u32 = 3;
 
@@ -44,8 +47,6 @@ impl Task for ReplyGenerationTask {
             .get_sync("user_input")
             .ok_or_else(|| TaskExecutionFailed("user_input not found in context".into()))?;
 
-        let ctx: String = "foo".to_string();
-
         info!(
             "Generating answer (attempt {} of {})",
             retry_count + 1,
@@ -54,6 +55,10 @@ impl Task for ReplyGenerationTask {
 
         // Get the full chat history for conversational memory
         let history = context.get_all_messages().await;
+        // let chat_history = context.get_chat_history().await;
+
+        // chat_history.last_messages(n)
+
         // .into_iter()
         // .map(|m| rig::completion::Message::)
         // .collect();
@@ -61,30 +66,41 @@ impl Task for ReplyGenerationTask {
         let agent = get_llm_agent()
             .map_err(|e| TaskExecutionFailed(format!("Failed to initialize LLM agent: {e}")))?;
 
-        let prompt = if history.is_empty() {
-            format!(
-                r#"
-            You are a movie recommendation assistant.
-            Use the following information to answer the user request for a movie recommendation.
-            If the information is not sufficient, answer as best you can.
-            Information:
-            {ctx}
-            Question: {user_input}"#
-            )
-        } else {
-            info!(retry_count = %retry_count, "running a retry attempt");
-            format!(
-                r#"
-            You are a movie recommendation assistant.
-            The user asked: "{user_input}"
-            
-            Based on the validation feedback in our conversation above, and the context above, provide an improved movie recommendation.
-            Focus on the specific issues mentioned in the feedback.
-            Provide a complete recommendation without referring to previous attempts.
-            "#
-            )
-        };
+        // let prompt = if history.is_empty() {
+        //     format!(
+        //         r#"
+        //     You are a movie recommendation assistant.
+        //     Use the following information to answer the user request for a movie recommendation.
+        //     If the information is not sufficient, answer as best you can.
+        //     Information:
+        //     {ctx}
+        //     Question: {user_input}"#
+        //     )
+        // } else {
+        //     info!(retry_count = %retry_count, "running a retry attempt");
+        //     format!(
+        //         r#"
+        //     You are a movie recommendation assistant.
+        //     The user asked: "{user_input}"
 
+        //     Based on the validation feedback in our conversation above, and the context above, provide an improved movie recommendation.
+        //     Focus on the specific issues mentioned in the feedback.
+        //     Provide a complete recommendation without referring to previous attempts.
+        //     "#
+        //     )
+        // };
+
+        let context_json = serde_json::to_string(&context).unwrap();
+
+        let prompt = MainSystemPromptTemplate {
+            user_input,
+            history: history.clone(),
+            context: context_json,
+        }
+        .render()
+        .unwrap();
+
+        // agent.
         let answer = agent
             .chat(
                 &prompt,

@@ -1,7 +1,5 @@
 use std::{env, sync::Arc};
 
-// use teloxide::{Bot, prelude::*, utils::command::BotCommands};
-
 use axum::{
     Json, Router,
     extract::State,
@@ -60,7 +58,7 @@ async fn chat(State(state): State<AppState>, Json(params): Json<ChatRequest>) ->
 
     let session = Session {
         id: session_id.clone(),
-        graph_id: "recommendation_flow".to_string(),
+        graph_id: "".to_string(),
         current_task_id: reply_task_id.to_string(),
         status_message: None,
         context,
@@ -144,7 +142,7 @@ async fn setup_graph(
 
     // Build graph
     let graph = Arc::new(
-        GraphBuilder::new("recommendation_flow")
+        GraphBuilder::new("greenrock_main_flow")
             .add_task(reply_task)
             // .add_task(search_task)
             // .add_task(answer_task)
@@ -163,9 +161,7 @@ async fn setup_graph(
             .build(),
     );
 
-    graph_storage
-        .save("recommendation_flow".to_string(), graph)
-        .await?;
+    graph_storage.save("".to_string(), graph).await?;
 
     info!("Graph built and saved successfully");
     Ok(())
@@ -229,10 +225,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_graph(graph_storage.clone()).await?;
 
     // Get the graph for FlowRunner
-    let graph = graph_storage
-        .get("recommendation_flow")
-        .await?
-        .ok_or("recommendation_flow graph not found")?;
+    let graph = graph_storage.get("").await?.ok_or(" graph not found")?;
 
     // Create FlowRunner
     let flow_runner = Arc::new(FlowRunner::new(graph, session_storage.clone()));
