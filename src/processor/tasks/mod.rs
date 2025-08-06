@@ -1,0 +1,12 @@
+pub mod binance_operations_task;
+pub mod binance_reporting_task;
+pub mod entry_interaction_task;
+pub mod portfolio_aggregation_task;
+pub mod portfolio_reporting_task;
+pub mod portfolio_selection_task;
+pub mod regimen_aggregation_task;
+pub mod regimen_evaluation_task;
+pub mod regimen_reporting_task;
+pub mod regimen_selection_task;
+pub mod regimen_switching_task;
+pub mod reply_generation_task;
