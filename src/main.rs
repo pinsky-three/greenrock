@@ -1,4 +1,4 @@
-use std::{env, sync::Arc};
+use std::{env, sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
@@ -7,10 +7,13 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+
+use chrono::{DateTime, TimeDelta};
 use graph_flow::{
     Context, ExecutionStatus, FlowRunner, GraphBuilder, GraphStorage, InMemoryGraphStorage,
     PostgresSessionStorage, Session, SessionStorage, Task,
 };
+
 use greenrock::{
     brokers::{binance::BinanceBroker, core::Broker},
     processor::tasks::{
@@ -25,8 +28,11 @@ use greenrock::{
         regimen_switching_task::RegimenSwitchingTask, reply_generation_task::ReplyGenerationTask,
     },
 };
+
 // use polars::prelude::{IntoLazy, col};
 use serde::{Deserialize, Serialize};
+use ta::{DataItem, indicators::AverageTrueRange};
+use ta::{Next, indicators::StandardDeviation};
 use tracing::{Level, error, info};
 use uuid::Uuid;
 
@@ -329,18 +335,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Minimal logging loop
     tokio::spawn(async move {
+        let mut ta = AverageTrueRange::new(10).unwrap();
+
         loop {
             match candle_rx.recv().await {
                 Ok(candle) => {
+                    let di = DataItem::builder()
+                        .high(candle.high)
+                        .low(candle.low)
+                        .close(candle.close)
+                        .open(candle.open)
+                        .volume(candle.volume)
+                        // .timestamp(candle.timestamp)
+                        .build()
+                        .unwrap();
+
+                    let atr = ta.next(&di);
+
                     info!(
-                        "candle close={} high={} low={} ts={}",
+                        "candle close={} high={} low={} ts={} atr={:.2}",
                         candle.close,
                         candle.high,
                         candle.low,
                         // candle.open,
                         // candle.volume,
-                        candle.timestamp
+                        candle.timestamp,
+                        atr,
                     );
+
+                    // println!("atr: {atr:?}");
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                     info!("candle stream lagged by {} messages", n);
