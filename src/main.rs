@@ -44,6 +44,14 @@ struct ChatResponse {
     status: String,
 }
 
+#[derive(Debug, Serialize)]
+struct PauseResponse {
+    session_id: String,
+    status: String,
+    next_task: String,
+    reason: String,
+}
+
 fn internal_error(message: &str) -> Response {
     (StatusCode::INTERNAL_SERVER_ERROR, message.to_string()).into_response()
 }
@@ -118,13 +126,13 @@ async fn chat(State(state): State<AppState>, Json(params): Json<ChatRequest>) ->
         ExecutionStatus::Paused {
             next_task_id,
             reason,
-        } => {
-            info!(
-                "Workflow unexpectedly paused at task: {} (reason: {})",
-                next_task_id, reason
-            );
-            internal_error("Workflow is paused, which is not expected in this flow")
-        }
+        } => Json(PauseResponse {
+            session_id,
+            status: "paused".to_string(),
+            next_task: next_task_id.to_string(),
+            reason: reason.to_string(),
+        })
+        .into_response(),
         ExecutionStatus::WaitingForInput => {
             info!("Workflow unexpectedly waiting for input");
             internal_error("Workflow is waiting for input, which is not expected in this flow")
@@ -280,42 +288,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Starting greenrock chat service");
 
-    // let df = load_btc_data("processed_btc_data/2025-01.parquet");
-
-    // let mut strategy = MinimalStrategy::new(df.clone());
-
-    // let df = df
-    //     .clone()
-    //     .lazy()
-    //     .select([
-    //         col("timestamp"),
-    //         col("open"),
-    //         col("high"),
-    //         col("low"),
-    //         col("close"),
-    //         col("volume"),
-    //     ])
-    //     .collect()
-    //     .unwrap();
-
-    // let start = Instant::now();
-
-    // for i in 0..df.shape().0 {
-    //     let tick = row_to_kline(&df, i);
-    //     strategy.state = strategy.tick(&mut strategy.state.clone(), Some(tick));
-    // }
-
-    // println!(
-    //     "evaluated {} klines in {:.3}s",
-    //     df.shape().0,
-    //     start.elapsed().as_secs_f64()
-    // );
-
-    // let bot = Bot::from_env();
-
-    // Command::repl(bot, answer).await;
-
-    // Setup storage
     let database_url =
         env::var("DATABASE_URL").map_err(|_| "DATABASE_URL environment variable not set")?;
 
@@ -350,39 +322,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
-// #[derive(BotCommands, Clone)]
-// #[command(
-//     rename_rule = "lowercase",
-//     description = "These commands are supported:"
-// )]
-// enum Command {
-//     #[command(description = "display this text.")]
-//     Help,
-//     #[command(description = "handle a username.")]
-//     Username(String),
-//     #[command(description = "handle a username and an age.", parse_with = "split")]
-//     UsernameAndAge { username: String, age: u8 },
-// }
-
-// async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
-//     match cmd {
-//         Command::Help => {
-//             bot.send_message(msg.chat.id, Command::descriptions().to_string())
-//                 .await?
-//         }
-//         Command::Username(username) => {
-//             bot.send_message(msg.chat.id, format!("Your username is @{username}."))
-//                 .await?
-//         }
-//         Command::UsernameAndAge { username, age } => {
-//             bot.send_message(
-//                 msg.chat.id,
-//                 format!("Your username is @{username} and age is {age}."),
-//             )
-//             .await?
-//         }
-//     };
-
-//     Ok(())
-// }

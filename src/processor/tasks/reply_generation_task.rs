@@ -23,13 +23,14 @@ impl Task for ReplyGenerationTask {
     }
 
     async fn run(&self, context: Context) -> graph_flow::Result<TaskResult> {
-        info!("Starting portfolio selection task");
+        info!("Starting reply generation task");
 
-        // TODO: Implement portfolio selection logic
-        // This task should select optimal portfolio configurations
+        let answer = context.get_sync::<String>("answer").unwrap();
+
+        info!("Answer: {}", answer);
 
         Ok(TaskResult::new(
-            Some("Portfolio selection completed".to_string()),
+            Some("Reply generation completed".to_string()),
             NextAction::End,
         ))
     }

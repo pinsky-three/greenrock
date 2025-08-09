@@ -22,13 +22,6 @@ pub fn get_llm_agent(
         .map_err(|_| anyhow::anyhow!("OPENROUTER_API_KEY not set"))?;
 
     let client = rig::providers::openrouter::Client::new(&api_key);
-    // let vector_store = rig::vector_store::in_memory_store::InMemoryVectorStore::default();
-
-    // let a = client
-    //     .extractor::<u32>("google/gemini-2.0-flash-001")
-    //     .build();
-
-    // let f = a.extract("".to_string()).await.unwrap();
 
     let agent = client
         .agent("google/gemini-2.0-flash-001")
@@ -57,14 +50,6 @@ impl Task for EntryInteractionTask {
     async fn run(&self, context: Context) -> graph_flow::Result<TaskResult> {
         info!("Starting answer generation task");
 
-        // let user_query: String = context
-        //     .get_sync("user_query")
-        //     .ok_or_else(|| TaskExecutionFailed("user_query not found in context".into()))?;
-
-        // let ctx: String = context
-        //     .get_sync("retrieved_context")
-        //     .ok_or_else(|| TaskExecutionFailed("retrieved_context not found in context".into()))?;
-
         let retry_count: u32 = context
             .get_sync("retry_count")
             .ok_or_else(|| TaskExecutionFailed("retry_count not found in context".into()))?;
@@ -79,41 +64,10 @@ impl Task for EntryInteractionTask {
             MAX_RETRIES + 1
         );
 
-        // Get the full chat history for conversational memory
         let messages = context.get_all_messages().await;
-
-        // chat_history.last_messages(n)
-
-        // .into_iter()
-        // .map(|m| rig::completion::Message::)
-        // .collect();
 
         let agent = get_llm_agent(self.system_prompt.clone())
             .map_err(|e| TaskExecutionFailed(format!("Failed to initialize LLM agent: {e}")))?;
-
-        // let prompt = if history.is_empty() {
-        //     format!(
-        //         r#"
-        //     You are a movie recommendation assistant.
-        //     Use the following information to answer the user request for a movie recommendation.
-        //     If the information is not sufficient, answer as best you can.
-        //     Information:
-        //     {ctx}
-        //     Question: {user_input}"#
-        //     )
-        // } else {
-        //     info!(retry_count = %retry_count, "running a retry attempt");
-        //     format!(
-        //         r#"
-        //     You are a movie recommendation assistant.
-        //     The user asked: "{user_input}"
-
-        //     Based on the validation feedback in our conversation above, and the context above, provide an improved movie recommendation.
-        //     Focus on the specific issues mentioned in the feedback.
-        //     Provide a complete recommendation without referring to previous attempts.
-        //     "#
-        //     )
-        // };
 
         let context_json = serde_json::to_string(&context).unwrap();
 
@@ -142,21 +96,6 @@ impl Task for EntryInteractionTask {
             .await
             .map_err(|e| TaskExecutionFailed(format!("LLM prompt failed: {e}")))?;
 
-        // let answer = agent
-        //     .chat(
-        //         &prompt,
-        //         messages
-        //             .iter()
-        //             .map(|m| match m.role {
-        //                 MessageRole::User => Message::user(m.content.clone()),
-        //                 MessageRole::Assistant => Message::assistant(m.content.clone()),
-        //                 MessageRole::System => Message::assistant(m.content.clone()),
-        //             })
-        //             .collect(),
-        //     )
-        //     .await
-        //     .map_err(|e| TaskExecutionFailed(format!("LLM chat failed: {e}")))?;
-
         info!("Answer generated: {}", answer);
 
         // Add the current answer attempt to chat history
@@ -167,6 +106,6 @@ impl Task for EntryInteractionTask {
 
         context.set("answer", answer.clone()).await;
 
-        Ok(TaskResult::new(Some(answer), NextAction::End))
+        Ok(TaskResult::new(Some(answer), NextAction::Continue))
     }
 }
