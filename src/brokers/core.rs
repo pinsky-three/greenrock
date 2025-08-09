@@ -12,4 +12,8 @@ pub trait Broker {
     fn balance(&self) -> HashMap<String, f64>;
 
     fn market_current_price(&self, symbol: &str) -> f64;
+    fn candle_stream(
+        &self,
+        symbol: &str,
+    ) -> tokio::sync::broadcast::Receiver<crate::models::timeseries::Candle>;
 }

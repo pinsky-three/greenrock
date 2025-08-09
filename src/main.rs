@@ -11,16 +11,19 @@ use graph_flow::{
     Context, ExecutionStatus, FlowRunner, GraphBuilder, GraphStorage, InMemoryGraphStorage,
     PostgresSessionStorage, Session, SessionStorage, Task,
 };
-use greenrock::processor::tasks::{
-    binance_operations_task::BinanceOperationsTask, binance_reporting_task::BinanceReportingTask,
-    entry_interaction_task::EntryInteractionTask,
-    portfolio_aggregation_task::PortfolioAggregationTask,
-    portfolio_reporting_task::PortfolioReportingTask,
-    portfolio_selection_task::PortfolioSelectionTask,
-    regimen_aggregation_task::RegimenAggregationTask,
-    regimen_evaluation_task::RegimenEvaluationTask, regimen_reporting_task::RegimenReportingTask,
-    regimen_selection_task::RegimenSelectionTask, regimen_switching_task::RegimenSwitchingTask,
-    reply_generation_task::ReplyGenerationTask,
+use greenrock::{
+    brokers::{binance::BinanceBroker, core::Broker},
+    processor::tasks::{
+        binance_operations_task::BinanceOperationsTask,
+        binance_reporting_task::BinanceReportingTask, entry_interaction_task::EntryInteractionTask,
+        portfolio_aggregation_task::PortfolioAggregationTask,
+        portfolio_reporting_task::PortfolioReportingTask,
+        portfolio_selection_task::PortfolioSelectionTask,
+        regimen_aggregation_task::RegimenAggregationTask,
+        regimen_evaluation_task::RegimenEvaluationTask,
+        regimen_reporting_task::RegimenReportingTask, regimen_selection_task::RegimenSelectionTask,
+        regimen_switching_task::RegimenSwitchingTask, reply_generation_task::ReplyGenerationTask,
+    },
 };
 // use polars::prelude::{IntoLazy, col};
 use serde::{Deserialize, Serialize};
@@ -286,39 +289,73 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compact()
         .init();
 
-    info!("Starting greenrock chat service");
+    // info!("Starting greenrock chat service");
 
-    let database_url =
-        env::var("DATABASE_URL").map_err(|_| "DATABASE_URL environment variable not set")?;
+    // let database_url =
+    //     env::var("DATABASE_URL").map_err(|_| "DATABASE_URL environment variable not set")?;
 
-    let session_storage: Arc<dyn SessionStorage> =
-        Arc::new(PostgresSessionStorage::connect(&database_url).await?);
+    // let session_storage: Arc<dyn SessionStorage> =
+    //     Arc::new(PostgresSessionStorage::connect(&database_url).await?);
 
-    let graph_storage: Arc<dyn GraphStorage> = Arc::new(InMemoryGraphStorage::new());
+    // let graph_storage: Arc<dyn GraphStorage> = Arc::new(InMemoryGraphStorage::new());
 
-    setup_graph(graph_storage.clone()).await?;
+    // setup_graph(graph_storage.clone()).await?;
 
-    // Get the graph for FlowRunner
-    let graph = graph_storage.get("").await?.ok_or(" graph not found")?;
+    // // Get the graph for FlowRunner
+    // let graph = graph_storage.get("").await?.ok_or(" graph not found")?;
 
-    // Create FlowRunner
-    let flow_runner = Arc::new(FlowRunner::new(graph, session_storage.clone()));
+    // // Create FlowRunner
+    // let flow_runner = Arc::new(FlowRunner::new(graph, session_storage.clone()));
 
-    let state = AppState {
-        flow_runner,
-        session_storage,
-    };
+    // let state = AppState {
+    //     flow_runner,
+    //     session_storage,
+    // };
 
-    let app = Router::new()
-        .route("/health", get(health_check))
-        .route("/chat", post(chat))
-        .with_state(state);
+    // let app = Router::new()
+    //     .route("/health", get(health_check))
+    //     .route("/chat", post(chat))
+    //     .with_state(state);
 
-    // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    // // run our app with hyper, listening globally on port 3000
+    // let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
+    // axum::serve(listener, app).await.unwrap();
 
-    info!("Greenrock chat service is running on: http://localhost:8000");
+    // info!("Greenrock chat service is running on: http://localhost:8000");
+
+    let binance_broker = BinanceBroker::new();
+
+    let mut candle_rx = binance_broker.candle_stream("btcusdt");
+
+    // Minimal logging loop
+    tokio::spawn(async move {
+        loop {
+            match candle_rx.recv().await {
+                Ok(candle) => {
+                    info!(
+                        "candle close={} high={} low={} open={} vol={} ts={}",
+                        candle.close,
+                        candle.high,
+                        candle.low,
+                        candle.open,
+                        candle.volume,
+                        candle.timestamp
+                    );
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                    info!("candle stream lagged by {} messages", n);
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    info!("candle stream closed");
+                    break;
+                }
+            }
+        }
+    });
+
+    // Keep process alive; Ctrl-C to quit
+    tokio::signal::ctrl_c().await?;
+    info!("shutting down");
 
     Ok(())
 }

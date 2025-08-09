@@ -42,7 +42,7 @@ impl Default for StrategyState {
 
 pub trait Strategy {
     // fn start(&self, state: &StrategyState) -> StrategyState;
-    fn tick(&self, state: &mut StrategyState, tick: Option<Kline>) -> StrategyState;
+    fn tick(&self, state: &mut StrategyState, tick: Kline) -> StrategyState;
 }
 
 pub struct MinimalStrategy {
@@ -62,12 +62,10 @@ impl MinimalStrategy {
 }
 
 impl Strategy for MinimalStrategy {
-    fn tick(&self, state: &mut StrategyState, tick: Option<Kline>) -> StrategyState {
-        if let Some(tick) = tick {
-            let close = tick.close.parse::<f64>().unwrap();
+    fn tick(&self, state: &mut StrategyState, tick: Kline) -> StrategyState {
+        let close = tick.close.parse::<f64>().unwrap();
 
-            state.state.insert("close".to_string(), close);
-        }
+        state.state.insert("close".to_string(), close);
 
         (*state).clone()
     }
