@@ -6,10 +6,7 @@ use binance::{account::Account, api::Binance, market::Market};
 use crate::brokers::core::Broker;
 use crate::models::timeseries::Candle;
 
-pub struct BinanceBroker {
-    market: Market,
-    account: Account,
-}
+pub struct BinanceBroker {}
 
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -19,7 +16,10 @@ use tokio_tungstenite::tungstenite::Message;
 
 impl Broker for BinanceBroker {
     fn balance(&self) -> HashMap<String, f64> {
-        match self.account.get_account() {
+        let api_key = Some(env::var("BINANCE_API_KEY").unwrap());
+        let secret_key = Some(env::var("BINANCE_SECRET_KEY").unwrap());
+        let account: Account = Binance::new(api_key, secret_key);
+        match account.get_account() {
             Ok(answer) => {
                 let res = answer
                     .balances
@@ -44,7 +44,8 @@ impl Broker for BinanceBroker {
     }
 
     fn market_current_price(&self, symbol: &str) -> f64 {
-        self.market.get_price(symbol).unwrap().price
+        let market: Market = Binance::new(None, None);
+        market.get_price(symbol).unwrap().price
     }
 
     fn candle_stream(
@@ -60,10 +61,7 @@ impl Broker for BinanceBroker {
             let max_backoff = Duration::from_secs(60);
 
             loop {
-                let url = format!(
-                    "wss://stream.binance.com:9443/ws/{}@kline_{}",
-                    symbol, interval
-                );
+                let url = format!("wss://stream.binance.com:9443/ws/{symbol}@kline_{interval}");
 
                 match tokio_tungstenite::connect_async(&url).await {
                     Ok((mut ws, _resp)) => {
@@ -107,33 +105,7 @@ impl Broker for BinanceBroker {
 
 impl BinanceBroker {
     pub fn new() -> Self {
-        let market = Binance::new(None, None);
-
-        let api_key = Some(env::var("BINANCE_API_KEY").unwrap());
-        let secret_key = Some(env::var("BINANCE_SECRET_KEY").unwrap());
-
-        let account: Account = Binance::new(api_key, secret_key);
-
-        // tokio::spawn(async move {
-        //     if let Ok(answer) = user_stream.start() {
-        //         println!("Data Stream Started ...");
-        //         let listen_key = answer.listen_key;
-
-        //         match user_stream.que tkeep_alive(&listen_key) {
-        //             Ok(msg) => println!("Keepalive user data stream: {msg:?}"),
-        //             Err(e) => println!("Error: {e:?}"),
-        //         }
-
-        //         match user_stream.close(&listen_key) {
-        //             Ok(msg) => println!("Close user data stream: {msg:?}"),
-        //             Err(e) => println!("Error: {e:?}"),
-        //         }
-        //     } else {
-        //         println!("Not able to start an User Stream (Check your API_KEY)");
-        //     }
-        // });
-
-        Self { market, account }
+        Self {}
     }
 }
 
