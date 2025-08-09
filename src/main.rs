@@ -333,12 +333,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match candle_rx.recv().await {
                 Ok(candle) => {
                     info!(
-                        "candle close={} high={} low={} open={} vol={} ts={}",
+                        "candle close={} high={} low={} ts={}",
                         candle.close,
                         candle.high,
                         candle.low,
-                        candle.open,
-                        candle.volume,
+                        // candle.open,
+                        // candle.volume,
                         candle.timestamp
                     );
                 }
