@@ -31,7 +31,10 @@ use greenrock::{
 
 // use polars::prelude::{IntoLazy, col};
 use serde::{Deserialize, Serialize};
-use ta::{DataItem, indicators::AverageTrueRange};
+use ta::{
+    DataItem,
+    indicators::{AverageTrueRange, ExponentialMovingAverage, MovingAverageConvergenceDivergence},
+};
 use ta::{Next, indicators::StandardDeviation};
 use tracing::{Level, error, info};
 use uuid::Uuid;
@@ -335,7 +338,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Minimal logging loop
     tokio::spawn(async move {
-        let mut ta = AverageTrueRange::new(10).unwrap();
+        let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap();
 
         loop {
             match candle_rx.recv().await {
@@ -350,17 +353,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .build()
                         .unwrap();
 
-                    let atr = ta.next(&di);
+                    let macd_res = macd.next(&di);
 
                     info!(
-                        "candle close={} high={} low={} ts={} atr={:.2}",
+                        "candle close={} high={} low={} ts={} macd={:.3}",
                         candle.close,
                         candle.high,
                         candle.low,
                         // candle.open,
                         // candle.volume,
                         candle.timestamp,
-                        atr,
+                        macd_res.macd,
                     );
 
                     // println!("atr: {atr:?}");
