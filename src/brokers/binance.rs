@@ -173,8 +173,8 @@ impl Default for BinanceBroker {
 
 #[derive(Deserialize)]
 struct WsEnvelope {
-    #[serde(default)]
-    stream: Option<String>,
+    // #[serde(default)]
+    // stream: Option<String>,
     #[serde(default)]
     data: Option<KlineData>,
     #[serde(rename = "k", default)]
@@ -189,10 +189,10 @@ struct KlineData {
 
 #[derive(Deserialize)]
 struct KlineInner {
-    #[serde(rename = "s")]
-    symbol: String,
-    #[serde(rename = "t")]
-    open_time: u64,
+    // #[serde(rename = "s")]
+    // symbol: String,
+    // #[serde(rename = "t")]
+    // open_time: u64,
     #[serde(rename = "T")]
     close_time: u64,
     #[serde(rename = "o")]
@@ -205,8 +205,8 @@ struct KlineInner {
     close: String,
     #[serde(rename = "v")]
     volume: String,
-    #[serde(rename = "x")]
-    is_final: bool,
+    // #[serde(rename = "x")]
+    // is_final: bool,
 }
 
 fn parse_kline(text: &str) -> Result<Candle, serde_json::Error> {

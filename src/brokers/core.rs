@@ -10,12 +10,12 @@ pub trait Broker {
         symbol: &str,
         interval: &str,
     ) -> tokio::sync::broadcast::Receiver<crate::models::timeseries::Candle>;
-    async fn candles(
+    fn candles(
         &self,
         symbol: &str,
         interval: &str,
         limit: u16,
         from: Option<DateTime<Utc>>,
         to: Option<DateTime<Utc>>,
-    ) -> Vec<crate::models::timeseries::Candle>;
+    ) -> impl std::future::Future<Output = Vec<crate::models::timeseries::Candle>> + Send;
 }

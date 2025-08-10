@@ -27,8 +27,11 @@ use greenrock::{
         regimen_reporting_task::RegimenReportingTask, regimen_selection_task::RegimenSelectionTask,
         regimen_switching_task::RegimenSwitchingTask, reply_generation_task::ReplyGenerationTask,
     },
+    runner::runner::Runner,
+    strategy::core::{MinimalStrategy, StrategyState},
 };
 
+use polars::frame::DataFrame;
 // use polars::prelude::{IntoLazy, col};
 use serde::{Deserialize, Serialize};
 use ta::{
@@ -332,66 +335,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // info!("Greenrock chat service is running on: http://localhost:8000");
 
-    let binance_broker = BinanceBroker::new();
+    // let total_candles = binance_broker
+    //     .candles(
+    //         "BTCUSDT",
+    //         "1m",
+    //         1000,
+    //         Some(Utc::now() - Duration::from_secs(60 * 60 * 24)),
+    //         Some(Utc::now()),
+    //     )
+    //     .await;
 
-    let mut candle_rx = binance_broker.candle_stream("BTCUSDT", "1m");
+    // info!("total candles: {}", total_candles.len());
 
-    tokio::spawn(async move {
-        let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap();
+    let strategy = MinimalStrategy::new(DataFrame::new(vec![]).unwrap());
+    let init_state = strategy.state.clone();
 
-        loop {
-            match candle_rx.recv().await {
-                Ok(candle) => {
-                    let di = DataItem::builder()
-                        .high(candle.high)
-                        .low(candle.low)
-                        .close(candle.close)
-                        .open(candle.open)
-                        .volume(candle.volume)
-                        // .timestamp(candle.timestamp)
-                        .build()
-                        .unwrap();
+    let runner = Runner::new(Box::new(strategy.clone()));
 
-                    let macd_res = macd.next(&di);
-
-                    info!(
-                        "candle close={:.2} high={:.2} low={:.2} volume={:.3} macd={:.3}",
-                        candle.close,
-                        candle.high,
-                        candle.low,
-                        // candle.open,
-                        candle.volume,
-                        // candle.timestamp,
-                        macd_res.macd,
-                    );
-
-                    // println!("atr: {atr:?}");
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                    info!("candle stream lagged by {} messages", n);
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                    info!("candle stream closed");
-                    break;
-                }
-            }
-        }
-    });
-
-    let total_candles = binance_broker
-        .candles(
-            "BTCUSDT",
-            "1m",
-            1000,
-            Some(Utc::now() - Duration::from_secs(60 * 60 * 24)),
-            Some(Utc::now()),
-        )
-        .await;
-
-    info!("total candles: {}", total_candles.len());
+    runner.run_until_ctrl_c(init_state).await;
 
     // Keep process alive; Ctrl-C to quit
-    tokio::signal::ctrl_c().await?;
+    // tokio::signal::ctrl_c().await?;
     info!("shutting down");
 
     Ok(())

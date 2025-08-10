@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use binance::model::Kline;
-
 use polars::frame::DataFrame;
 use rust_decimal::Decimal;
+use tracing::info;
+
+use crate::models::timeseries::Candle;
 // use rust_decimal::prelude::*;
 
 #[derive(Clone)]
@@ -24,29 +25,44 @@ pub struct StrategyTrade {
 }
 
 #[derive(Clone)]
-pub struct StrategyState {
+pub struct StrategyState<T>
+where
+    T: Clone,
+{
     _data_scope: DataFrame,
     _trades: HashMap<String, StrategyTrade>,
-    state: HashMap<String, f64>,
+    state: T,
 }
 
-impl Default for StrategyState {
-    fn default() -> Self {
-        Self {
-            _data_scope: DataFrame::new(vec![]).unwrap(),
-            _trades: HashMap::new(),
-            state: HashMap::new(),
-        }
-    }
-}
+// impl<T> Default for StrategyState<T>
+// where
+//     T: Clone,
+// {
+//     fn default() -> Self {
+//         Self {
+//             _data_scope: DataFrame::new(vec![]).unwrap(),
+//             _trades: HashMap::new(),
+//             state: T::default(),
+//         }
+//     }
+// }
 
 pub trait Strategy {
-    // fn start(&self, state: &StrategyState) -> StrategyState;
-    fn tick(&self, state: &mut StrategyState, tick: Kline) -> StrategyState;
+    type State: Clone;
+
+    fn init(&self, state: &mut StrategyState<Self::State>) -> StrategyState<Self::State>;
+    fn end(&self, state: &mut StrategyState<Self::State>) -> StrategyState<Self::State>;
+
+    fn tick(
+        &self,
+        state: &mut StrategyState<Self::State>,
+        tick: Candle,
+    ) -> StrategyState<Self::State>;
 }
 
+#[derive(Clone)]
 pub struct MinimalStrategy {
-    pub state: StrategyState,
+    pub state: StrategyState<HashMap<String, f64>>,
 }
 
 impl MinimalStrategy {
@@ -62,11 +78,27 @@ impl MinimalStrategy {
 }
 
 impl Strategy for MinimalStrategy {
-    fn tick(&self, state: &mut StrategyState, tick: Kline) -> StrategyState {
-        let close = tick.close.parse::<f64>().unwrap();
+    type State = HashMap<String, f64>;
+
+    fn tick(
+        &self,
+        state: &mut StrategyState<Self::State>,
+        tick: Candle,
+    ) -> StrategyState<Self::State> {
+        let close = tick.close;
 
         state.state.insert("close".to_string(), close);
 
         (*state).clone()
+    }
+
+    fn init(&self, _state: &mut StrategyState<Self::State>) -> StrategyState<Self::State> {
+        info!("init minimal strategy");
+        _state.clone()
+    }
+
+    fn end(&self, _state: &mut StrategyState<Self::State>) -> StrategyState<Self::State> {
+        info!("end minimal strategy");
+        _state.clone()
     }
 }
