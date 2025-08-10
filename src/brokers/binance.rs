@@ -107,7 +107,7 @@ impl Broker for BinanceBroker {
         rx
     }
 
-    fn candles(
+    async fn candles(
         &self,
         symbol: &str,
         interval: &str,
@@ -116,38 +116,46 @@ impl Broker for BinanceBroker {
         to: Option<DateTime<Utc>>,
     ) -> Vec<Candle> {
         // let market: Market = Binance::new(None, None);
-        let start_ms = from.map(|f| f.timestamp_millis() as u64);
-        let end_ms = to.map(|t| t.timestamp_millis() as u64);
 
-        let symbol = symbol.to_uppercase();
+        let symbol = symbol.to_string();
+        let interval = interval.to_string();
 
-        if let Some(start_ms) = start_ms
-            && let Some(end_ms) = end_ms
-        {
-            info!("fetching candles for {symbol} from {start_ms} to {end_ms}");
-        } else {
-            info!("fetching latest {limit} candles for {symbol}");
-        }
+        tokio::task::spawn_blocking(move || {
+            let start_ms = from.map(|f| f.timestamp_millis() as u64);
+            let end_ms = to.map(|t| t.timestamp_millis() as u64);
 
-        let market: Market = Binance::new(None, None);
+            let symbol = symbol.to_uppercase();
 
-        match market.get_klines(symbol, interval, limit, start_ms, end_ms) {
-            Ok(KlineSummaries::AllKlineSummaries(summaries)) => summaries
-                .into_iter()
-                .map(|k| Candle {
-                    open: k.open.parse().unwrap_or(0.0),
-                    high: k.high.parse().unwrap_or(0.0),
-                    low: k.low.parse().unwrap_or(0.0),
-                    close: k.close.parse().unwrap_or(0.0),
-                    volume: k.volume.parse().unwrap_or(0.0),
-                    timestamp: k.close_time,
-                })
-                .collect(),
-            Err(e) => {
-                error!("failed to fetch klines: {e}");
-                Vec::new()
+            if let Some(start_ms) = start_ms
+                && let Some(end_ms) = end_ms
+            {
+                info!("fetching candles for {symbol} from {start_ms} to {end_ms}");
+            } else {
+                info!("fetching latest {limit} candles for {symbol}");
             }
-        }
+
+            let market: Market = Binance::new(None, None);
+
+            match market.get_klines(&symbol, &interval, limit, start_ms, end_ms) {
+                Ok(KlineSummaries::AllKlineSummaries(summaries)) => summaries
+                    .into_iter()
+                    .map(|k| Candle {
+                        open: k.open.parse().unwrap_or(0.0),
+                        high: k.high.parse().unwrap_or(0.0),
+                        low: k.low.parse().unwrap_or(0.0),
+                        close: k.close.parse().unwrap_or(0.0),
+                        volume: k.volume.parse().unwrap_or(0.0),
+                        timestamp: k.close_time,
+                    })
+                    .collect(),
+                Err(e) => {
+                    error!("failed to fetch klines: {e}");
+                    Vec::new()
+                }
+            }
+        })
+        .await
+        .unwrap()
     }
 }
 

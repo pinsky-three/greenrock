@@ -10,7 +10,7 @@ pub trait Broker {
         symbol: &str,
         interval: &str,
     ) -> tokio::sync::broadcast::Receiver<crate::models::timeseries::Candle>;
-    fn candles(
+    async fn candles(
         &self,
         symbol: &str,
         interval: &str,

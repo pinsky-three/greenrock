@@ -378,19 +378,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let candles = tokio::task::spawn_blocking(move || {
-        binance_broker.candles(
+    let total_candles = binance_broker
+        .candles(
             "BTCUSDT",
             "1m",
             1000,
             Some(Utc::now() - Duration::from_secs(60 * 60 * 24)),
             Some(Utc::now()),
         )
-    })
-    .await
-    .unwrap();
+        .await;
 
-    info!("total candles: {}", candles.len());
+    info!("total candles: {}", total_candles.len());
 
     // Keep process alive; Ctrl-C to quit
     tokio::signal::ctrl_c().await?;
