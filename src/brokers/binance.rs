@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 use std::env;
 
+use binance::model::KlineSummaries;
 use binance::{account::Account, api::Binance, market::Market};
+use chrono::{DateTime, Utc};
+use tracing::{error, info};
 
 use crate::brokers::core::Broker;
 use crate::models::timeseries::Candle;
@@ -51,12 +54,14 @@ impl Broker for BinanceBroker {
     fn candle_stream(
         &self,
         symbol: &str,
+        interval: &str,
     ) -> broadcast::Receiver<crate::models::timeseries::Candle> {
         let (tx, rx) = broadcast::channel::<Candle>(1024);
         let symbol = symbol.to_lowercase();
 
+        let interval = interval.to_string();
+
         tokio::spawn(async move {
-            let interval = "1s"; // default interval; adjust if needed
             let mut backoff = Duration::from_secs(1);
             let max_backoff = Duration::from_secs(60);
 
@@ -100,6 +105,49 @@ impl Broker for BinanceBroker {
         });
 
         rx
+    }
+
+    fn candles(
+        &self,
+        symbol: &str,
+        interval: &str,
+        limit: u16,
+        from: Option<DateTime<Utc>>,
+        to: Option<DateTime<Utc>>,
+    ) -> Vec<Candle> {
+        // let market: Market = Binance::new(None, None);
+        let start_ms = from.map(|f| f.timestamp_millis() as u64);
+        let end_ms = to.map(|t| t.timestamp_millis() as u64);
+
+        let symbol = symbol.to_uppercase();
+
+        if let Some(start_ms) = start_ms
+            && let Some(end_ms) = end_ms
+        {
+            info!("fetching candles for {symbol} from {start_ms} to {end_ms}");
+        } else {
+            info!("fetching latest {limit} candles for {symbol}");
+        }
+
+        let market: Market = Binance::new(None, None);
+
+        match market.get_klines(symbol, interval, limit, start_ms, end_ms) {
+            Ok(KlineSummaries::AllKlineSummaries(summaries)) => summaries
+                .into_iter()
+                .map(|k| Candle {
+                    open: k.open.parse().unwrap_or(0.0),
+                    high: k.high.parse().unwrap_or(0.0),
+                    low: k.low.parse().unwrap_or(0.0),
+                    close: k.close.parse().unwrap_or(0.0),
+                    volume: k.volume.parse().unwrap_or(0.0),
+                    timestamp: k.close_time,
+                })
+                .collect(),
+            Err(e) => {
+                error!("failed to fetch klines: {e}");
+                Vec::new()
+            }
+        }
     }
 }
 

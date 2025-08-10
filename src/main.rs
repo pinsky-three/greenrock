@@ -8,7 +8,7 @@ use axum::{
     routing::{get, post},
 };
 
-use chrono::{DateTime, TimeDelta};
+use chrono::{DateTime, TimeDelta, Utc};
 use graph_flow::{
     Context, ExecutionStatus, FlowRunner, GraphBuilder, GraphStorage, InMemoryGraphStorage,
     PostgresSessionStorage, Session, SessionStorage, Task,
@@ -334,9 +334,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let binance_broker = BinanceBroker::new();
 
-    let mut candle_rx = binance_broker.candle_stream("btcusdt");
+    let mut candle_rx = binance_broker.candle_stream("BTCUSDT", "1m");
 
-    // Minimal logging loop
     tokio::spawn(async move {
         let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap();
 
@@ -356,13 +355,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let macd_res = macd.next(&di);
 
                     info!(
-                        "candle close={} high={} low={} ts={} macd={:.3}",
+                        "candle close={:.2} high={:.2} low={:.2} volume={:.3} macd={:.3}",
                         candle.close,
                         candle.high,
                         candle.low,
                         // candle.open,
-                        // candle.volume,
-                        candle.timestamp,
+                        candle.volume,
+                        // candle.timestamp,
                         macd_res.macd,
                     );
 
@@ -378,6 +377,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     });
+
+    let candles = tokio::task::spawn_blocking(move || {
+        binance_broker.candles(
+            "BTCUSDT",
+            "1m",
+            1000,
+            Some(Utc::now() - Duration::from_secs(60 * 60 * 24)),
+            Some(Utc::now()),
+        )
+    })
+    .await
+    .unwrap();
+
+    info!("total candles: {}", candles.len());
 
     // Keep process alive; Ctrl-C to quit
     tokio::signal::ctrl_c().await?;
