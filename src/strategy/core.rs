@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use polars::frame::DataFrame;
 use rust_decimal::Decimal;
+// use ta::{DataItem, Next, indicators::MovingAverageConvergenceDivergence};
 use tracing::info;
 
 use crate::models::timeseries::Candle;
@@ -25,13 +26,10 @@ pub struct StrategyTrade {
 }
 
 #[derive(Clone)]
-pub struct StrategyState<T>
-where
-    T: Clone,
-{
-    _data_scope: DataFrame,
-    _trades: HashMap<String, StrategyTrade>,
-    state: T,
+pub struct StrategyContext {
+    pub _data_scope: DataFrame,
+    pub _trades: HashMap<String, StrategyTrade>,
+    // state: T,
 }
 
 // impl<T> Default for StrategyState<T>
@@ -50,28 +48,39 @@ where
 pub trait Strategy {
     type State: Clone;
 
-    fn init(&self, state: &mut StrategyState<Self::State>) -> StrategyState<Self::State>;
-    fn end(&self, state: &mut StrategyState<Self::State>) -> StrategyState<Self::State>;
+    fn init(
+        &self,
+        ctx: &mut StrategyContext,
+        state: &mut Self::State,
+    ) -> (StrategyContext, Self::State);
+
+    fn end(
+        &self,
+        ctx: &mut StrategyContext,
+        state: &mut Self::State,
+    ) -> (StrategyContext, Self::State);
 
     fn tick(
         &self,
-        state: &mut StrategyState<Self::State>,
+        ctx: &mut StrategyContext,
+        state: &mut Self::State,
         tick: Candle,
-    ) -> StrategyState<Self::State>;
+    ) -> StrategyContext;
+
+    fn state(&self) -> Self::State;
 }
 
 #[derive(Clone)]
 pub struct MinimalStrategy {
-    pub state: StrategyState<HashMap<String, f64>>,
+    pub context: StrategyContext,
 }
 
 impl MinimalStrategy {
     pub fn new(data_scope: DataFrame) -> Self {
         Self {
-            state: StrategyState {
+            context: StrategyContext {
                 _data_scope: data_scope,
                 _trades: HashMap::new(),
-                state: HashMap::new(),
             },
         }
     }
@@ -82,23 +91,62 @@ impl Strategy for MinimalStrategy {
 
     fn tick(
         &self,
-        state: &mut StrategyState<Self::State>,
+        ctx: &mut StrategyContext,
+        state: &mut Self::State,
         tick: Candle,
-    ) -> StrategyState<Self::State> {
+    ) -> StrategyContext {
         let close = tick.close;
 
-        state.state.insert("close".to_string(), close);
+        state.insert("close".to_string(), close);
 
-        (*state).clone()
+        let macd = state.get("macd").unwrap_or(&0.0);
+
+        // if macd.is_none() {
+        //     let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap();
+        //     macd.next(&di);
+        //     state.state.insert("macd".to_string(), macd.next(&di));
+        // }
+
+        info!("macd: {:?}", macd);
+
+        (*ctx).clone()
     }
 
-    fn init(&self, _state: &mut StrategyState<Self::State>) -> StrategyState<Self::State> {
+    fn init(
+        &self,
+        ctx: &mut StrategyContext,
+        state: &mut Self::State,
+    ) -> (StrategyContext, Self::State) {
         info!("init minimal strategy");
-        _state.clone()
+        // let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap();
+
+        // let di = DataItem::builder()
+        //     .high(candle.high)
+        //     .low(candle.low)
+        //     .close(candle.close)
+        //     .open(candle.open)
+        //     .volume(candle.volume)
+        //     // .timestamp(candle.timestamp)
+        //     .build()
+        //     .unwrap();
+
+        // macd.next(&di);
+        // state.state.insert("macd".to_string(), macd.next(&di));
+        state.insert("macd".to_string(), 0.33);
+
+        (ctx.clone(), state.clone())
     }
 
-    fn end(&self, _state: &mut StrategyState<Self::State>) -> StrategyState<Self::State> {
+    fn end(
+        &self,
+        ctx: &mut StrategyContext,
+        state: &mut Self::State,
+    ) -> (StrategyContext, Self::State) {
         info!("end minimal strategy");
-        _state.clone()
+        (ctx.clone(), state.clone())
+    }
+
+    fn state(&self) -> Self::State {
+        Self::State::default()
     }
 }

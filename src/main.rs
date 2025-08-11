@@ -27,8 +27,8 @@ use greenrock::{
         regimen_reporting_task::RegimenReportingTask, regimen_selection_task::RegimenSelectionTask,
         regimen_switching_task::RegimenSwitchingTask, reply_generation_task::ReplyGenerationTask,
     },
-    runner::runner::Runner,
-    strategy::core::{MinimalStrategy, StrategyState},
+    runner::core::Runner,
+    strategy::core::{MinimalStrategy, Strategy},
 };
 
 use polars::frame::DataFrame;
@@ -348,11 +348,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // info!("total candles: {}", total_candles.len());
 
     let strategy = MinimalStrategy::new(DataFrame::new(vec![]).unwrap());
-    let init_state = strategy.state.clone();
+    let initial_state = strategy.state();
 
     let runner = Runner::new(Box::new(strategy.clone()));
 
-    runner.run_until_ctrl_c(init_state).await;
+    runner.run_until_ctrl_c(initial_state).await;
 
     // Keep process alive; Ctrl-C to quit
     // tokio::signal::ctrl_c().await?;
