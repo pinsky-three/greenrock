@@ -1,6 +1,27 @@
 use async_trait::async_trait;
 use graph_flow::{Context, NextAction, Task, TaskResult};
+use rig::agent::Agent;
+use rig::client::CompletionClient;
+use rig::providers::openai;
+use rig::providers::openrouter::CompletionModel;
 use tracing::info;
+use anyhow::Result;
+use crate::rig_tools::market_analysis::MarketAnalysis;
+
+pub fn get_binance_agent() -> Result<Agent<CompletionModel>> {
+    let api_key = std::env::var("OPENROUTER_API_KEY")    
+        .map_err(|_| anyhow::anyhow!("OPENROUTER_API_KEY not set"))?;
+
+    let client = rig::providers::openrouter::Client::new(&api_key);
+
+    let agent = client
+        .agent(openai::GPT_4O_MINI)
+        .preamble("")
+        .tool(MarketAnalysis)
+        .build();
+
+    Ok(agent)
+}
 
 pub struct BinanceOperationsTask;
 
