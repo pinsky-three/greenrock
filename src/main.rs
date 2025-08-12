@@ -27,7 +27,7 @@ use greenrock::{
         regimen_reporting_task::RegimenReportingTask, regimen_selection_task::RegimenSelectionTask,
         regimen_switching_task::RegimenSwitchingTask, reply_generation_task::ReplyGenerationTask,
     },
-    runner::core::Runner,
+    runner::core::{RunConfig, Runner},
     strategy::core::{MinimalStrategy, Strategy},
 };
 
@@ -348,11 +348,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // info!("total candles: {}", total_candles.len());
 
     let strategy = MinimalStrategy::new(DataFrame::new(vec![]).unwrap());
-    let initial_state = strategy.state();
+    let initial_state = strategy.default_state();
 
     let runner = Runner::new(Box::new(strategy.clone()));
 
-    runner.run_until_ctrl_c(initial_state).await;
+    runner
+        .run_until_ctrl_c(
+            &RunConfig {
+                symbol: "BTCUSDT".to_string(),
+                interval: "1m".to_string(),
+            },
+            initial_state,
+        )
+        .await;
 
     // Keep process alive; Ctrl-C to quit
     // tokio::signal::ctrl_c().await?;

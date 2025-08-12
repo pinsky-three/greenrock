@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use chrono::{Duration, Utc};
 use polars::frame::DataFrame;
 // use ta::{DataItem, Next, indicators::MovingAverageConvergenceDivergence};
 use tokio::signal;
@@ -19,9 +20,17 @@ where
     strategy: Box<dyn Strategy<State = State>>,
 }
 
+pub struct RunConfig {
+    pub symbol: String,
+    pub interval: String,
+    // pub data_scope_len: usize,
+    // pub start_time: Option<DateTime<Utc>>,
+    // pub end_time: Option<DateTime<Utc>>,
+}
+
 impl<State> Runner<State>
 where
-    State: Clone,
+    State: Clone + Default,
 {
     pub fn new(strategy: Box<dyn Strategy<State = State>>) -> Self {
         Self { strategy }
@@ -30,7 +39,7 @@ where
     pub async fn run_with_token(
         &self,
         mut init_state: State,
-        // mut tick_rx: broadcast::Receiver<Candle>,
+        config: &RunConfig,
         cancel: CancellationToken,
     ) -> StrategyContext {
         let mut init_ctx = StrategyContext {
@@ -42,9 +51,21 @@ where
 
         let binance_broker = BinanceBroker::new();
 
-        let mut candle_rx = binance_broker.candle_stream("BTCUSDT", "1s");
+        let mut candle_rx = binance_broker.candle_stream(&config.symbol, &config.interval);
 
-        // let mut state = HashMap::<String, f64>::new();
+        // let mut data_scope = Vec::new();
+
+        let mut data_scope = binance_broker
+            .candles(
+                &config.symbol,
+                &config.interval,
+                1000,
+                Some(Utc::now() - Duration::days(1)),
+                Some(Utc::now()),
+            )
+            .await;
+
+        // data_scope.reverse();
 
         loop {
             tokio::select! {
@@ -82,9 +103,11 @@ where
                             //     _trades: HashMap::new(),
                             // };
 
+                            data_scope.push(candle.clone());
 
-
-                            ctx = self.strategy.tick(&mut ctx, &mut state, candle);
+                            ctx = self
+                                .strategy
+                                .tick(&mut ctx, &mut state, data_scope.clone(), candle);
 
                             // println!("atr: {atr:?}");
                         }
@@ -105,7 +128,7 @@ where
         ctx
     }
 
-    pub async fn run_until_ctrl_c(&self, state: State) -> StrategyContext {
+    pub async fn run_until_ctrl_c(&self, config: &RunConfig, state: State) -> StrategyContext {
         let cancel = CancellationToken::new();
         let cancel_clone = cancel.clone();
         tokio::spawn(async move {
@@ -113,6 +136,6 @@ where
             cancel_clone.cancel();
         });
 
-        self.run_with_token(state, cancel).await
+        self.run_with_token(state, config, cancel).await
     }
 }

@@ -46,7 +46,7 @@ pub struct StrategyContext {
 // }
 
 pub trait Strategy {
-    type State: Clone;
+    type State: Clone + Default;
 
     fn init(
         &self,
@@ -64,10 +64,11 @@ pub trait Strategy {
         &self,
         ctx: &mut StrategyContext,
         state: &mut Self::State,
+        data_scope: Vec<Candle>,
         tick: Candle,
     ) -> StrategyContext;
 
-    fn state(&self) -> Self::State;
+    fn default_state(&self) -> Self::State;
 }
 
 #[derive(Clone)]
@@ -93,11 +94,16 @@ impl Strategy for MinimalStrategy {
         &self,
         ctx: &mut StrategyContext,
         state: &mut Self::State,
+        data_scope: Vec<Candle>,
         tick: Candle,
     ) -> StrategyContext {
         let close = tick.close;
 
         state.insert("close".to_string(), close);
+
+        let data_scope_len = data_scope.len();
+
+        info!("data_scope_len: {}", data_scope_len);
 
         let macd = state.get("macd").unwrap_or(&0.0);
 
@@ -146,7 +152,7 @@ impl Strategy for MinimalStrategy {
         (ctx.clone(), state.clone())
     }
 
-    fn state(&self) -> Self::State {
+    fn default_state(&self) -> Self::State {
         Self::State::default()
     }
 }
