@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use polars::frame::DataFrame;
 use rust_decimal::Decimal;
@@ -97,22 +97,23 @@ impl Strategy for MinimalStrategy {
         data_scope: Vec<Candle>,
         tick: Candle,
     ) -> StrategyContext {
+        let now = Instant::now();
         // let close = tick.close;
 
         // state.insert("close".to_string(), close);
 
-        let data_scope_len = data_scope.len();
+        // let data_scope_len = data_scope.len();
 
-        info!("data_scope_len: {}", data_scope_len);
+        // info!("data_scope_len: {}", data_scope_len);
 
         // let macd = state.get("macd").unwrap_or(&0.0);
         let macd = data_scope.macd(12, 26, 9);
         state.insert("macd".to_string(), macd.macd);
 
-        let ema = data_scope.ema(12);
+        let ema = data_scope.ema(20);
         state.insert("ema".to_string(), ema);
 
-        let st = data_scope.supertrend(14, 3.0);
+        let st = data_scope.best_supertrend_from_cluster(10, 1.0, 5.0, 0.5, 3.0, "Best");
         state.insert("st".to_string(), st.value);
 
         // if macd.is_none() {
@@ -121,7 +122,12 @@ impl Strategy for MinimalStrategy {
         //     state.state.insert("macd".to_string(), macd.next(&di));
         // }
 
-        info!("macd: {:?}, ema: {:?}, st: {:?}", macd.macd, ema, st.trend);
+        let duration = now.elapsed();
+
+        info!(
+            "[{}] macd: {:.3}, ema: {:.3}, st: {:.3}, trend: {:?} (computed in {:?})",
+            tick.timestamp, macd.macd, ema, st.value, st.trend, duration,
+        );
 
         (*ctx).clone()
     }
@@ -147,7 +153,7 @@ impl Strategy for MinimalStrategy {
         // macd.next(&di);
         // state.state.insert("macd".to_string(), macd.next(&di));
 
-        state.insert("macd".to_string(), 0.33);
+        // state.insert("macd".to_string(), 0.33);
 
         (ctx.clone(), state.clone())
     }
