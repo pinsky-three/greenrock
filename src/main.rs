@@ -347,16 +347,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // info!("total candles: {}", total_candles.len());
 
-    let strategy = MinimalStrategy::new(DataFrame::new(vec![]).unwrap());
+    let strategy = Box::new(MinimalStrategy::new(DataFrame::new(vec![]).unwrap()));
     let initial_state = strategy.default_state();
 
-    let runner = Runner::new(Box::new(strategy.clone()));
+    let runner = Runner::new(strategy);
 
     runner
         .run_until_ctrl_c(
             &RunConfig {
                 symbol: "BTCUSDT".to_string(),
-                interval: "1m".to_string(),
+                interval: "1s".to_string(),
             },
             initial_state,
         )

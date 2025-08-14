@@ -146,6 +146,7 @@ impl Broker for BinanceBroker {
                         close: k.close.parse().unwrap_or(0.0),
                         volume: k.volume.parse().unwrap_or(0.0),
                         timestamp: k.close_time,
+                        ts: DateTime::from_timestamp_millis(k.close_time).unwrap(),
                     })
                     .collect(),
                 Err(e) => {
@@ -220,5 +221,6 @@ fn parse_kline(text: &str) -> Result<Candle, serde_json::Error> {
         volume: k.volume.parse().unwrap_or(0.0),
         // Use close time in ms to align with binance semantics
         timestamp: k.close_time as i64,
+        ts: DateTime::from_timestamp_millis(k.close_time as i64).unwrap(),
     })
 }

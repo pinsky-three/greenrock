@@ -10,6 +10,7 @@ use tracing::info;
 
 use crate::{
     brokers::{binance::BinanceBroker, core::Broker},
+    models::timeseries::CandleRing,
     strategy::core::{Strategy, StrategyContext},
 };
 
@@ -55,7 +56,7 @@ where
 
         // let mut data_scope = Vec::new();
 
-        let mut data_scope = binance_broker
+        let data_scope = binance_broker
             .candles(
                 &config.symbol,
                 &config.interval,
@@ -65,7 +66,11 @@ where
             )
             .await;
 
-        // data_scope.reverse();
+        let mut data_scope_ring = CandleRing::new(2000);
+
+        for candle in data_scope {
+            data_scope_ring.upsert(candle);
+        }
 
         loop {
             tokio::select! {
@@ -103,11 +108,12 @@ where
                             //     _trades: HashMap::new(),
                             // };
 
-                            data_scope.push(candle.clone());
+                            // data_scope.push(candle.clone());
+                            data_scope_ring.upsert(candle.clone());
 
                             ctx = self
                                 .strategy
-                                .tick(&mut ctx, &mut state, data_scope.clone(), candle);
+                                .tick(&mut ctx, &mut state, data_scope_ring.snapshot(), candle);
 
                             // println!("atr: {atr:?}");
                         }
