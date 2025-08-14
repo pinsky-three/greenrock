@@ -356,7 +356,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .run_until_ctrl_c(
             &RunConfig {
                 symbol: "BTCUSDT".to_string(),
-                interval: "1s".to_string(),
+                interval: "1m".to_string(),
             },
             initial_state,
         )

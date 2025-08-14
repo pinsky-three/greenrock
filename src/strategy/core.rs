@@ -5,7 +5,7 @@ use rust_decimal::Decimal;
 // use ta::{DataItem, Next, indicators::MovingAverageConvergenceDivergence};
 use tracing::info;
 
-use crate::models::timeseries::Candle;
+use crate::models::{analysis::TechnicalAnalysis, timeseries::Candle};
 // use rust_decimal::prelude::*;
 
 #[derive(Clone)]
@@ -97,15 +97,23 @@ impl Strategy for MinimalStrategy {
         data_scope: Vec<Candle>,
         tick: Candle,
     ) -> StrategyContext {
-        let close = tick.close;
+        // let close = tick.close;
 
-        state.insert("close".to_string(), close);
+        // state.insert("close".to_string(), close);
 
         let data_scope_len = data_scope.len();
 
         info!("data_scope_len: {}", data_scope_len);
 
-        let macd = state.get("macd").unwrap_or(&0.0);
+        // let macd = state.get("macd").unwrap_or(&0.0);
+        let macd = data_scope.macd(12, 26, 9);
+        state.insert("macd".to_string(), macd.macd);
+
+        let ema = data_scope.ema(12);
+        state.insert("ema".to_string(), ema);
+
+        let st = data_scope.supertrend(14, 3.0);
+        state.insert("st".to_string(), st.value);
 
         // if macd.is_none() {
         //     let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap();
@@ -113,7 +121,7 @@ impl Strategy for MinimalStrategy {
         //     state.state.insert("macd".to_string(), macd.next(&di));
         // }
 
-        info!("macd: {:?}", macd);
+        info!("macd: {:?}, ema: {:?}, st: {:?}", macd.macd, ema, st.trend);
 
         (*ctx).clone()
     }
@@ -138,6 +146,7 @@ impl Strategy for MinimalStrategy {
 
         // macd.next(&di);
         // state.state.insert("macd".to_string(), macd.next(&di));
+
         state.insert("macd".to_string(), 0.33);
 
         (ctx.clone(), state.clone())
