@@ -1,7 +1,8 @@
 use std::{collections::HashMap, time::Instant};
 
+use chrono::{DateTime, Utc};
 use polars::frame::DataFrame;
-use rust_decimal::Decimal;
+use rust_decimal::{Decimal, prelude::ToPrimitive};
 // use ta::{DataItem, Next, indicators::MovingAverageConvergenceDivergence};
 use tracing::info;
 
@@ -63,6 +64,7 @@ pub trait Strategy {
     fn tick(
         &self,
         ctx: &mut StrategyContext,
+        timestamp: DateTime<Utc>,
         state: &mut Self::State,
         symbol: String,
         data_scope: Vec<Candle>,
@@ -88,10 +90,26 @@ impl MinimalStrategy {
     }
 }
 
+// pub enum StrategyAction {
+//     Sell(String, f64),
+//     Buy(String, f64),
+//     Nothing,
+// }
+
+#[derive(Clone, Debug)]
+pub struct TradingAction {
+    pub id: String,
+    pub timestamp: DateTime<Utc>,
+    pub symbol: String,
+    pub amount: f64,
+    // pub action: StrategyAction,
+}
+
+#[derive(Clone, Debug)]
 pub enum StrategyAction {
-    Sell(String, f64),
-    Buy(String, f64),
-    Nothing,
+    Emitted(Box<TradingAction>),
+    // Stop(TradingAction),
+    Pass,
 }
 
 impl Strategy for MinimalStrategy {
@@ -100,6 +118,7 @@ impl Strategy for MinimalStrategy {
     fn tick(
         &self,
         _ctx: &mut StrategyContext,
+        timestamp: DateTime<Utc>,
         state: &mut Self::State,
         symbol: String,
         data_scope: Vec<Candle>,
@@ -121,8 +140,8 @@ impl Strategy for MinimalStrategy {
         let ema = data_scope.ema(20);
         state.insert("ema".to_string(), ema);
 
-        let st = data_scope.best_supertrend_from_cluster(10, 1.0, 5.0, 0.5, 3.0, "Best");
-        state.insert("st".to_string(), st.value);
+        let st = data_scope.supertrend(10, 3.0);
+        state.insert("st".to_string(), st.trend as f64);
 
         // if macd.is_none() {
         //     let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap();
@@ -137,11 +156,26 @@ impl Strategy for MinimalStrategy {
             tick.timestamp, macd.macd, ema, st.value, st.trend, duration,
         );
 
-        match st.trend {
-            -1 => StrategyAction::Sell(symbol, tick.close),
-            1 => StrategyAction::Buy(symbol, tick.close),
-            _ => StrategyAction::Nothing,
+        // match st.trend {
+        //     -1 => StrategyAction::Sell(symbol, tick.close),
+        //     1 => StrategyAction::Buy(symbol, tick.close),
+        //     _ => StrategyAction::Pass,
+        // }
+
+        let last_timestamp = state.get("last_timestamp").unwrap_or(&0_f64);
+
+        if st.trend == 1 && timestamp.timestamp() != last_timestamp.to_i64().unwrap() {
+            state.insert("last_timestamp".to_string(), timestamp.timestamp() as f64);
+
+            return StrategyAction::Emitted(Box::new(TradingAction {
+                id: "sell".to_string(),
+                timestamp,
+                symbol,
+                amount: 0.01,
+            }));
         }
+
+        StrategyAction::Pass
     }
 
     fn init(

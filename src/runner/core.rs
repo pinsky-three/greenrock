@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use polars::frame::DataFrame;
-// use ta::{DataItem, Next, indicators::MovingAverageConvergenceDivergence};
+
 use tokio::signal;
 
 use tokio_util::sync::CancellationToken;
@@ -115,6 +115,7 @@ where
                                 .strategy
                                 .tick(
                                     &mut ctx,
+                                    DateTime::from_timestamp(candle.timestamp, 0).unwrap(),
                                     &mut state,
                                     config.symbol.to_string(),
                                     data_scope_ring.snapshot(),
@@ -122,14 +123,11 @@ where
                                 );
 
                             match response {
-                                StrategyAction::Sell(symbol, price) => {
-                                    info!("Selling {} at {}", symbol, price);
+                                StrategyAction::Emitted(action) => {
+                                    info!("Emitted action: {:?}", action);
                                 }
-                                StrategyAction::Buy(symbol, price) => {
-                                    info!("Buying {} at {}", symbol, price);
-                                }
-                                StrategyAction::Nothing => {
-                                    info!("Nothing to do");
+                                StrategyAction::Pass => {
+                                    info!("Pass");
                                 }
                             }
 
