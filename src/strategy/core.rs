@@ -64,9 +64,10 @@ pub trait Strategy {
         &self,
         ctx: &mut StrategyContext,
         state: &mut Self::State,
+        symbol: String,
         data_scope: Vec<Candle>,
         tick: Candle,
-    ) -> StrategyContext;
+    ) -> StrategyAction;
 
     fn default_state(&self) -> Self::State;
 }
@@ -87,16 +88,23 @@ impl MinimalStrategy {
     }
 }
 
+pub enum StrategyAction {
+    Sell(String, f64),
+    Buy(String, f64),
+    Nothing,
+}
+
 impl Strategy for MinimalStrategy {
     type State = HashMap<String, f64>;
 
     fn tick(
         &self,
-        ctx: &mut StrategyContext,
+        _ctx: &mut StrategyContext,
         state: &mut Self::State,
+        symbol: String,
         data_scope: Vec<Candle>,
         tick: Candle,
-    ) -> StrategyContext {
+    ) -> StrategyAction {
         let now = Instant::now();
         // let close = tick.close;
 
@@ -129,7 +137,11 @@ impl Strategy for MinimalStrategy {
             tick.timestamp, macd.macd, ema, st.value, st.trend, duration,
         );
 
-        (*ctx).clone()
+        match st.trend {
+            -1 => StrategyAction::Sell(symbol, tick.close),
+            1 => StrategyAction::Buy(symbol, tick.close),
+            _ => StrategyAction::Nothing,
+        }
     }
 
     fn init(

@@ -11,7 +11,7 @@ use tracing::info;
 use crate::{
     brokers::{binance::BinanceBroker, core::Broker},
     models::timeseries::CandleRing,
-    strategy::core::{Strategy, StrategyContext},
+    strategy::core::{Strategy, StrategyAction, StrategyContext},
 };
 
 pub struct Runner<State>
@@ -111,9 +111,27 @@ where
                             // data_scope.push(candle.clone());
                             data_scope_ring.upsert(candle.clone());
 
-                            ctx = self
+                            let response = self
                                 .strategy
-                                .tick(&mut ctx, &mut state, data_scope_ring.snapshot(), candle);
+                                .tick(
+                                    &mut ctx,
+                                    &mut state,
+                                    config.symbol.to_string(),
+                                    data_scope_ring.snapshot(),
+                                    candle,
+                                );
+
+                            match response {
+                                StrategyAction::Sell(symbol, price) => {
+                                    info!("Selling {} at {}", symbol, price);
+                                }
+                                StrategyAction::Buy(symbol, price) => {
+                                    info!("Buying {} at {}", symbol, price);
+                                }
+                                StrategyAction::Nothing => {
+                                    info!("Nothing to do");
+                                }
+                            }
 
                             // println!("atr: {atr:?}");
                         }
