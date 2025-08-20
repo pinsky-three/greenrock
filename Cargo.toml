@@ -22,3 +22,9 @@ uuid = { version = "1.17.0", features = ["v4"] }
 tracing-subscriber = "0.3.19"
 askama = "0.14.0"
 serde_json = "1.0.142"
+tokio-tungstenite = { version = "0.24.0", features = [
+    "rustls-tls-native-roots",
+] }
+futures-util = "0.3.31"
+tokio-util = { version = "0.7.12", features = ["rt"] }
+ta = "0.5.0"

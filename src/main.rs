@@ -1,29 +1,39 @@
-use std::{env, sync::Arc};
+use std::{collections::HashMap, env, sync::Arc};
 
 use axum::{
     Json, Router,
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+
 use graph_flow::{
     Context, ExecutionStatus, FlowRunner, GraphBuilder, GraphStorage, InMemoryGraphStorage,
     PostgresSessionStorage, Session, SessionStorage, Task,
 };
-use greenrock::processor::tasks::{
-    binance_operations_task::BinanceOperationsTask, binance_reporting_task::BinanceReportingTask,
-    entry_interaction_task::EntryInteractionTask,
-    portfolio_aggregation_task::PortfolioAggregationTask,
-    portfolio_reporting_task::PortfolioReportingTask,
-    portfolio_selection_task::PortfolioSelectionTask,
-    regimen_aggregation_task::RegimenAggregationTask,
-    regimen_evaluation_task::RegimenEvaluationTask, regimen_reporting_task::RegimenReportingTask,
-    regimen_selection_task::RegimenSelectionTask, regimen_switching_task::RegimenSwitchingTask,
-    reply_generation_task::ReplyGenerationTask,
+
+use greenrock::{
+    brokers::binance::BinanceBroker,
+    processor::tasks::{
+        binance_operations_task::BinanceOperationsTask,
+        binance_reporting_task::BinanceReportingTask, entry_interaction_task::EntryInteractionTask,
+        portfolio_aggregation_task::PortfolioAggregationTask,
+        portfolio_reporting_task::PortfolioReportingTask,
+        portfolio_selection_task::PortfolioSelectionTask,
+        regimen_aggregation_task::RegimenAggregationTask,
+        regimen_evaluation_task::RegimenEvaluationTask,
+        regimen_reporting_task::RegimenReportingTask, regimen_selection_task::RegimenSelectionTask,
+        regimen_switching_task::RegimenSwitchingTask, reply_generation_task::ReplyGenerationTask,
+    },
+    runner::core::{RunConfig, Runner},
+    strategy::core::{MinimalStrategy, Strategy},
 };
+
+use polars::frame::DataFrame;
 // use polars::prelude::{IntoLazy, col};
 use serde::{Deserialize, Serialize};
+
 use tracing::{Level, error, info};
 use uuid::Uuid;
 
@@ -86,7 +96,7 @@ async fn chat(State(state): State<AppState>, Json(params): Json<ChatRequest>) ->
 
     let session = Session {
         id: session_id.clone(),
-        graph_id: "default".to_string(),
+        graph_id: "".to_string(),
         current_task_id: reply_task_id.to_string(),
         status_message: None,
         context,
@@ -144,16 +154,47 @@ async fn chat(State(state): State<AppState>, Json(params): Json<ChatRequest>) ->
     }
 }
 
+async fn get_balance(State(state): State<AppState>) -> Response {
+    match tokio::task::spawn_blocking(move || state.runner.balance()).await {
+        Ok(balance) => Json(balance).into_response(),
+        Err(e) => {
+            error!("Failed to get balance: {}", e);
+            internal_error("Failed to get balance")
+        }
+    }
+}
+
+async fn get_open_orders(State(state): State<AppState>, symbol: Query<String>) -> Response {
+    match tokio::task::spawn_blocking(move || state.runner.open_orders(&symbol)).await {
+        Ok(orders) => Json(orders).into_response(),
+        Err(e) => {
+            error!("Failed to get open orders: {}", e);
+            internal_error("Failed to get open orders")
+        }
+    }
+}
+
+async fn get_trade_history(State(state): State<AppState>, symbol: Query<String>) -> Response {
+    match tokio::task::spawn_blocking(move || state.runner.trade_history(&symbol)).await {
+        Ok(history) => Json(history).into_response(),
+        Err(e) => {
+            error!("Failed to get trade history: {}", e);
+            internal_error("Failed to get trade history")
+        }
+    }
+}
+
 #[derive(Clone)]
 struct AppState {
     flow_runner: Arc<FlowRunner>,
     session_storage: Arc<dyn SessionStorage>,
+    runner: Arc<Runner<HashMap<String, f64>, BinanceBroker>>,
 }
 
 async fn setup_graph(
     graph_storage: Arc<dyn GraphStorage>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Setting up recommendation workflow graph");
+    info!("Setting up greenrock workflow graph");
 
     let entry_interaction_task: Arc<dyn Task> = Arc::new(EntryInteractionTask::new("".to_string()));
 
@@ -268,6 +309,38 @@ async fn setup_graph(
                 portfolio_reporting_task_id.clone(),
                 reply_generation_task_id.clone(),
             )
+            .add_edge(
+                regimen_selection_task_id.clone(),
+                reply_generation_task_id.clone(),
+            )
+            .add_edge(
+                binance_operations_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                portfolio_selection_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                portfolio_aggregation_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                regimen_aggregation_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                regimen_switching_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                regimen_evaluation_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                regimen_reporting_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
             .build(),
     );
 
@@ -298,27 +371,72 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     setup_graph(graph_storage.clone()).await?;
 
-    // Get the graph for FlowRunner
     let graph = graph_storage.get("").await?.ok_or(" graph not found")?;
 
-    // Create FlowRunner
-    let flow_runner = Arc::new(FlowRunner::new(graph, session_storage.clone()));
+    let flow_runner = Arc::new(FlowRunner::new(graph.clone(), session_storage.clone()));
+
+    let strategy = Box::new(MinimalStrategy::new(DataFrame::new(vec![]).unwrap()));
+    let initial_state = strategy.default_state();
+
+    let binance_broker = BinanceBroker::default();
+
+    let runner = Arc::new(Runner::new(binance_broker, strategy));
 
     let state = AppState {
         flow_runner,
         session_storage,
+        runner: runner.clone(),
     };
 
-    let app = Router::new()
+    let app: Router = Router::new()
         .route("/health", get(health_check))
         .route("/chat", post(chat))
+        .route("/balance", get(get_balance))
+        .route("/open_orders", get(get_open_orders))
+        .route("/trade_history", get(get_trade_history))
         .with_state(state);
 
-    // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    info!("Starting both web server and trading runner...");
 
-    info!("Greenrock chat service is running on: http://localhost:8000");
+    // Spawn the web server task
+    let web_server_handle = tokio::spawn(async move {
+        info!("Greenrock chat service is running on: http://localhost:8000");
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    // Spawn the trading runner task
+    let trading_runner_handle = tokio::spawn(async move {
+        info!("Starting trading runner for BTCUSDT...");
+        runner
+            .run_until_ctrl_c(
+                &RunConfig {
+                    symbol: "BTCUSDT".to_string(),
+                    interval: "1m".to_string(),
+                },
+                initial_state,
+            )
+            .await;
+    });
+
+    // Wait for Ctrl+C or either task to complete
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            info!("Received Ctrl+C, shutting down gracefully...");
+        }
+        result = web_server_handle => {
+            if let Err(e) = result {
+                error!("Web server task failed: {}", e);
+            }
+        }
+        result = trading_runner_handle => {
+            if let Err(e) = result {
+                error!("Trading runner task failed: {}", e);
+            }
+        }
+    }
+
+    info!("shutting down");
 
     Ok(())
 }
