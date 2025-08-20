@@ -4,7 +4,7 @@ import {
   ColorType,
   CandlestickSeries,
 } from "lightweight-charts";
-import type { Time, ISeriesApi } from "lightweight-charts";
+import type { Time, ISeriesApi, IChartApi } from "lightweight-charts";
 import { useEffect, useRef, useState, useCallback } from "react";
 
 type Candle = {
@@ -66,123 +66,95 @@ export const ChartComponent = (props: {
   candleData?: Candle[];
   onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
 }) => {
-  const {
-    colors: {
-      backgroundColor = "black",
-      lineColor = "#2962FF",
-      textColor = "white",
-      areaTopColor = "#2962FF",
-      areaBottomColor = "rgba(41, 98, 255, 0.28)",
-    } = {},
-    candleData,
-    onSeriesReady,
-  } = props;
+  const { candleData, onSeriesReady } = props;
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
+  const chartRef = useRef<IChartApi | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+
   useEffect(() => {
+    if (!chartContainerRef.current) return;
+
     const handleResize = () => {
-      chart.applyOptions({
+      if (chartRef.current) {
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current?.clientWidth,
+          height: chartContainerRef.current?.clientHeight || 400,
+        });
+      }
+    };
+
+    // Only create chart if it doesn't exist
+    if (!chartRef.current) {
+      const chart = createChart(chartContainerRef.current, {
+        layout: {
+          background: { type: ColorType.Solid, color: "#000000" },
+          textColor: "#ffffff",
+        },
+        grid: {
+          vertLines: {
+            color: "#1a1a1a",
+          },
+          horzLines: {
+            color: "#1a1a1a",
+          },
+        },
+        timeScale: {
+          borderColor: "#333333",
+          timeVisible: true,
+        },
+        rightPriceScale: {
+          borderColor: "#333333",
+        },
         width: chartContainerRef.current?.clientWidth,
         height: chartContainerRef.current?.clientHeight || 400,
       });
-    };
 
-    const chart = createChart(chartContainerRef.current!, {
-      layout: {
-        background: { type: ColorType.Solid, color: "#000000" },
-        textColor: "#ffffff",
-      },
-      grid: {
-        vertLines: {
-          color: "#1a1a1a",
-        },
-        horzLines: {
-          color: "#1a1a1a",
-        },
-      },
-      timeScale: {
-        borderColor: "#333333",
-        timeVisible: true,
-      },
-      rightPriceScale: {
-        borderColor: "#333333",
-      },
-      width: chartContainerRef.current?.clientWidth,
-      height: chartContainerRef.current?.clientHeight || 400,
-    });
+      const series = chart.addSeries(CandlestickSeries, {
+        upColor: "#00ff88",
+        downColor: "#ff4444",
+        borderVisible: false,
+        wickUpColor: "#00ff88",
+        wickDownColor: "#ff4444",
+      });
 
-    const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#00ff88",
-      downColor: "#ff4444",
-      borderVisible: false,
-      wickUpColor: "#00ff88",
-      wickDownColor: "#ff4444",
-    });
+      chartRef.current = chart;
+      seriesRef.current = series;
 
-    // Use real data if available, otherwise fall back to generated data
-    if (candleData && candleData.length > 0) {
-      series.setData(candleData);
+      // Notify parent component that series is ready for real-time updates
+      if (onSeriesReady) {
+        onSeriesReady(series);
+      }
+
+      chart.timeScale().fitContent();
+      chart.timeScale().scrollToPosition(5, true);
     }
-
-    // Notify parent component that series is ready for real-time updates
-    if (onSeriesReady) {
-      onSeriesReady(series);
-    }
-
-    // const chartOptions = {
-    //   layout: {
-    //     textColor: "white",
-    //     background: { type: "solid", color: "black" },
-    //   },
-    //   height: 200,
-    // };
-
-    chart.timeScale().fitContent();
-    chart.timeScale().scrollToPosition(5, true);
-
-    // Only simulate real-time data if using generated data
-    // let intervalID: ReturnType<typeof setInterval> | null = null;
-    // if (!candleData || candleData.length === 0) {
-    //   const data = generateData(2500, 20, 1000);
-
-    //   // simulate real-time data
-    //   function* getNextRealtimeUpdate(realtimeData: Candle[]) {
-    //     for (const dataPoint of realtimeData) {
-    //       yield dataPoint;
-    //     }
-    //     return null;
-    //   }
-    //   const streamingDataProvider = getNextRealtimeUpdate(data.realtimeUpdates);
-
-    //   intervalID = setInterval(() => {
-    //     const update = streamingDataProvider.next();
-    //     if (update.done) {
-    //       if (intervalID) clearInterval(intervalID);
-    //       return;
-    //     }
-    //     series.update(update.value);
-    //   }, 100);
-    // }
 
     window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      // if (intervalID) {
-      //   clearInterval(intervalID);
-      // }
-      chart.remove();
     };
-  }, [
-    backgroundColor,
-    lineColor,
-    textColor,
-    areaTopColor,
-    areaBottomColor,
-    candleData,
-    onSeriesReady,
-  ]);
+  }, [onSeriesReady]);
+
+  // Separate effect for updating data
+  useEffect(() => {
+    if (seriesRef.current && candleData && candleData.length > 0) {
+      seriesRef.current.setData(candleData);
+    }
+  }, [candleData]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+        seriesRef.current = null;
+      }
+    };
+  }, []);
 
   return <div ref={chartContainerRef} className="w-full h-full" />;
 };
@@ -338,9 +310,14 @@ export default function App() {
   }, [disconnectWebSocket]);
 
   // Handle series ready callback
-  const handleSeriesReady = useCallback((series: ISeriesApi<"Candlestick">) => {
-    setCandlestickSeries(series);
-  }, []);
+  const handleSeriesReady = useCallback(
+    (series: ISeriesApi<"Candlestick">) => {
+      if (!candlestickSeries) {
+        setCandlestickSeries(series);
+      }
+    },
+    [candlestickSeries]
+  );
 
   // Convert API candles to chart format
   const chartData = sessionData
