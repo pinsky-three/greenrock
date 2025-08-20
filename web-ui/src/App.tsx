@@ -5,18 +5,7 @@ import {
   ColorType,
 } from "lightweight-charts";
 import type { Time } from "lightweight-charts";
-import { useEffect, useRef } from "react";
-
-let randomFactor = 25 + Math.random() * 25;
-const samplePoint = (i: number) =>
-  i *
-    (0.5 +
-      Math.sin(i / 1) * 0.2 +
-      Math.sin(i / 2) * 0.4 +
-      Math.sin(i / randomFactor) * 0.8 +
-      Math.sin(i / 50) * 0.5) +
-  200 +
-  i * 2;
+import { useEffect, useRef, useState } from "react";
 
 type Candle = {
   time: Time;
@@ -26,77 +15,44 @@ type Candle = {
   close: number;
 };
 
-function generateData(
-  numberOfCandles = 500,
-  updatesPerCandle = 5,
-  startAt = 100
-): { initialData: Candle[]; realtimeUpdates: Candle[] } {
-  const createCandle = (val: number, time: number): Candle => ({
-    time: time as Time,
-    open: val,
-    high: val,
-    low: val,
-    close: val,
-  });
+type ApiCandle = {
+  close: number;
+  high: number;
+  low: number;
+  open: number;
+  timestamp: number;
+  ts: string;
+  volume: number;
+};
 
-  const updateCandle = (candle: Candle, val: number): Candle => ({
-    time: candle.time,
-    close: val,
+type Balance = {
+  [symbol: string]: number;
+};
+
+type LatestSessionResponse = {
+  session_id: string;
+  candles: ApiCandle[];
+  balance: Balance;
+};
+
+// Convert API candles to chart format
+function convertApiCandlesToChart(apiCandles: ApiCandle[]): Candle[] {
+  return apiCandles.map((candle) => ({
+    time: Math.floor(candle.timestamp / 1000) as Time,
     open: candle.open,
-    low: Math.min(candle.low, val),
-    high: Math.max(candle.high, val),
-  });
+    high: candle.high,
+    low: candle.low,
+    close: candle.close,
+  }));
+}
 
-  randomFactor = 25 + Math.random() * 25;
-  const date = new Date(Date.UTC(2018, 0, 1, 12, 0, 0, 0));
-  const numberOfPoints = numberOfCandles * updatesPerCandle;
-  const initialData: Candle[] = [];
-  const realtimeUpdates: Candle[] = [];
-  let lastCandle: Candle;
-  let currentTime = date.getTime() / 1000;
-
-  let previousValue = samplePoint(-1);
-  for (let i = 0; i < numberOfPoints; ++i) {
-    // Increment time for each data point to ensure unique timestamps
-    if (i % updatesPerCandle === 0) {
-      // New candle - increment by one day
-      currentTime += 86400; // 24 * 60 * 60 seconds
-    } else {
-      // Update to existing candle - increment by small amount to maintain order
-      currentTime += 60; // 1 minute
-    }
-
-    let value = samplePoint(i);
-    const diff = (value - previousValue) * Math.random();
-    value = previousValue + diff;
-    previousValue = value;
-
-    if (i % updatesPerCandle === 0) {
-      const candle = createCandle(value, currentTime);
-      lastCandle = candle;
-      if (i < startAt) {
-        initialData.push(candle);
-      } else {
-        realtimeUpdates.push(candle);
-      }
-    } else {
-      const newCandle = updateCandle(lastCandle!, value);
-      // Update the time for the candle update
-      newCandle.time = currentTime as Time;
-      lastCandle = newCandle;
-      if (i >= startAt) {
-        realtimeUpdates.push(newCandle);
-      } else if ((i + 1) % updatesPerCandle === 0) {
-        // Replace the last candle in initialData with the updated one
-        initialData[initialData.length - 1] = newCandle;
-      }
-    }
+// Fetch latest session data from API
+async function fetchLatestSession(): Promise<LatestSessionResponse> {
+  const response = await fetch("http://localhost:4200/latest_session");
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
-
-  return {
-    initialData,
-    realtimeUpdates,
-  };
+  return response.json();
 }
 
 export const ChartComponent = (props: {
@@ -107,6 +63,7 @@ export const ChartComponent = (props: {
     areaTopColor: string;
     areaBottomColor: string;
   };
+  candleData?: Candle[];
 }) => {
   const {
     colors: {
@@ -116,6 +73,7 @@ export const ChartComponent = (props: {
       areaTopColor = "#2962FF",
       areaBottomColor = "rgba(41, 98, 255, 0.28)",
     } = {},
+    candleData,
   } = props;
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -160,9 +118,10 @@ export const ChartComponent = (props: {
       wickDownColor: "#ff4444",
     });
 
-    const data = generateData(2500, 20, 1000);
-
-    series.setData(data.initialData);
+    // Use real data if available, otherwise fall back to generated data
+    if (candleData && candleData.length > 0) {
+      series.setData(candleData);
+    }
 
     // const chartOptions = {
     //   layout: {
@@ -175,44 +134,125 @@ export const ChartComponent = (props: {
     chart.timeScale().fitContent();
     chart.timeScale().scrollToPosition(5, true);
 
-    // simulate real-time data
-    function* getNextRealtimeUpdate(realtimeData: Candle[]) {
-      for (const dataPoint of realtimeData) {
-        yield dataPoint;
-      }
-      return null;
-    }
-    const streamingDataProvider = getNextRealtimeUpdate(data.realtimeUpdates);
+    // Only simulate real-time data if using generated data
+    // let intervalID: ReturnType<typeof setInterval> | null = null;
+    // if (!candleData || candleData.length === 0) {
+    //   const data = generateData(2500, 20, 1000);
 
-    const intervalID = setInterval(() => {
-      const update = streamingDataProvider.next();
-      if (update.done) {
-        clearInterval(intervalID);
-        return;
-      }
-      series.update(update.value);
-    }, 100);
+    //   // simulate real-time data
+    //   function* getNextRealtimeUpdate(realtimeData: Candle[]) {
+    //     for (const dataPoint of realtimeData) {
+    //       yield dataPoint;
+    //     }
+    //     return null;
+    //   }
+    //   const streamingDataProvider = getNextRealtimeUpdate(data.realtimeUpdates);
+
+    //   intervalID = setInterval(() => {
+    //     const update = streamingDataProvider.next();
+    //     if (update.done) {
+    //       if (intervalID) clearInterval(intervalID);
+    //       return;
+    //     }
+    //     series.update(update.value);
+    //   }, 100);
+    // }
 
     window.addEventListener("resize", handleResize);
 
     return () => {
       window.removeEventListener("resize", handleResize);
-
+      // if (intervalID) {
+      //   clearInterval(intervalID);
+      // }
       chart.remove();
     };
-  }, [backgroundColor, lineColor, textColor, areaTopColor, areaBottomColor]);
+  }, [
+    backgroundColor,
+    lineColor,
+    textColor,
+    areaTopColor,
+    areaBottomColor,
+    candleData,
+  ]);
 
   return <div ref={chartContainerRef} className="w-full h-full" />;
 };
 
 export default function App() {
+  const [sessionData, setSessionData] = useState<LatestSessionResponse | null>(
+    null
+  );
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load data function
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchLatestSession();
+      setSessionData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load data");
+      console.error("Failed to fetch session data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch data on component mount and set up auto-refresh
+  useEffect(() => {
+    loadData();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(loadData, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Convert API candles to chart format
+  const chartData = sessionData
+    ? convertApiCandlesToChart(sessionData.candles)
+    : undefined;
+
+  // Calculate portfolio value from balance
+  const calculatePortfolioValue = (balance: Balance): number => {
+    // For now, we'll just sum up the USDT value and estimate others
+    // In a real app, you'd fetch current prices for each asset
+    const usdtValue = balance.USDT || 0;
+    const btcValue = (balance.BTC || 0) * 100000; // Rough estimate
+    const ethValue = (balance.ETH || 0) * 3000; // Rough estimate
+    const solValue = (balance.SOL || 0) * 100; // Rough estimate
+    const adaValue = (balance.ADA || 0) * 1; // Rough estimate
+    const xrpValue = (balance.XRP || 0) * 2; // Rough estimate
+
+    return usdtValue + btcValue + ethValue + solValue + adaValue + xrpValue;
+  };
+
+  const portfolioValue = sessionData
+    ? calculatePortfolioValue(sessionData.balance)
+    : 0;
+
   return (
     <div className="h-screen w-screen bg-black text-white flex flex-col">
       {/* Header */}
-      <header className="bg-black p-3 border-b border-gray-800">
-        <h1 className="text-xl font-medium text-center text-gray-200">
-          Trading Dashboard
-        </h1>
+      <header className="bg-black p-3 border-b border-gray-800 flex justify-between items-center">
+        <h1 className="text-xl font-medium text-gray-200">Trading Dashboard</h1>
+        <div className="flex items-center space-x-3">
+          {sessionData && (
+            <span className="text-xs text-gray-500">
+              Last updated: {new Date().toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-3 py-1.5 rounded text-xs font-medium"
+          >
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -220,40 +260,51 @@ export default function App() {
         {/* Left Sidebar */}
         <aside className="w-56 bg-black border-r border-gray-800 p-3">
           <h2 className="text-sm font-medium mb-3 text-gray-300">
-            Market Overview
+            Portfolio Balance
           </h2>
           <div className="space-y-2">
-            <div className="bg-gray-900 p-2 rounded">
-              <div className="text-xs text-gray-400">BTC/USD</div>
-              <div className="text-green-400 font-medium text-sm">
-                $43,250.00
-              </div>
-              <div className="text-xs text-green-400">+2.34%</div>
-            </div>
-            <div className="bg-gray-900 p-2 rounded">
-              <div className="text-xs text-gray-400">ETH/USD</div>
-              <div className="text-red-400 font-medium text-sm">$2,890.50</div>
-              <div className="text-xs text-red-400">-1.22%</div>
-            </div>
-            <div className="bg-gray-900 p-2 rounded">
-              <div className="text-xs text-gray-400">SOL/USD</div>
-              <div className="text-green-400 font-medium text-sm">$98.75</div>
-              <div className="text-xs text-green-400">+5.67%</div>
-            </div>
+            {sessionData?.balance ? (
+              Object.entries(sessionData.balance)
+                .filter(([, value]) => value > 0)
+                .map(([symbol, amount]) => (
+                  <div key={symbol} className="bg-gray-900 p-2 rounded">
+                    <div className="text-xs text-gray-400">{symbol}</div>
+                    <div className="text-green-400 font-medium text-sm">
+                      {amount.toFixed(symbol === "USDT" ? 2 : 6)}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {symbol === "USDT" ? "USD" : "Available"}
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <div className="text-gray-500 text-xs">Loading balance...</div>
+            )}
           </div>
         </aside>
 
         {/* Center - Chart Area */}
         <main className="flex-1 bg-black">
-          <ChartComponent
-            colors={{
-              backgroundColor: "#000000",
-              lineColor: "#ffffff",
-              textColor: "#ffffff",
-              areaTopColor: "#000000",
-              areaBottomColor: "#000000",
-            }}
-          />
+          {error ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-red-400">Error: {error}</div>
+            </div>
+          ) : loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-gray-400">Loading chart data...</div>
+            </div>
+          ) : (
+            <ChartComponent
+              colors={{
+                backgroundColor: "#000000",
+                lineColor: "#ffffff",
+                textColor: "#ffffff",
+                areaTopColor: "#000000",
+                areaBottomColor: "#000000",
+              }}
+              candleData={chartData}
+            />
+          )}
         </main>
 
         {/* Right Sidebar */}
@@ -311,19 +362,17 @@ export default function App() {
             <div>
               <span className="text-xs text-gray-500">Portfolio Value: </span>
               <span className="text-sm font-medium text-green-400">
-                $15,847.32
+                ${portfolioValue.toFixed(2)}
               </span>
             </div>
             <div>
               <span className="text-xs text-gray-500">24h Change: </span>
-              <span className="text-sm font-medium text-green-400">
-                +$342.18 (+2.21%)
-              </span>
+              <span className="text-sm font-medium text-gray-400">N/A</span>
             </div>
             <div>
-              <span className="text-xs text-gray-500">Available Balance: </span>
+              <span className="text-xs text-gray-500">USDT Balance: </span>
               <span className="text-sm font-medium text-gray-200">
-                $2,156.89
+                ${(sessionData?.balance?.USDT || 0).toFixed(2)}
               </span>
             </div>
           </div>
