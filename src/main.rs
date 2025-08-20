@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, sync::Arc};
 
 use axum::{
     Json, Router,
-    extract::{Query, State},
+    extract::{Query, State, WebSocketUpgrade, ws::WebSocket},
     http::{Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -359,7 +359,7 @@ async fn get_latest_session(State(state): State<AppState>) -> Response {
     // Get candles asynchronously
     let candles_result = state
         .live_loop_runner
-        .candles("BTCUSDT", "1m", 1000, None, None)
+        .candles("BTCUSDT", "1m", 100, None, None)
         .await;
 
     // Get balance in blocking task
@@ -376,6 +376,72 @@ async fn get_latest_session(State(state): State<AppState>) -> Response {
         (_, Err(e)) => {
             error!("Failed to get balance: {}", e);
             internal_error("Failed to get balance")
+        }
+    }
+}
+
+async fn websocket_handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> Response {
+    ws.on_upgrade(move |socket| handle_socket(socket, state))
+}
+
+async fn handle_socket(mut socket: WebSocket, state: AppState) {
+    info!("WebSocket client connected");
+    let mut stream = state.live_loop_runner.candles_stream("BTCUSDT", "1m").await;
+
+    loop {
+        tokio::select! {
+            // Handle incoming candle data
+            recv_result = stream.recv() => {
+                match recv_result {
+                    Ok(candle) => {
+                        match serde_json::to_string(&candle) {
+                            Ok(msg) => {
+                                if socket.send(axum::extract::ws::Message::Text(msg.into())).await.is_err() {
+                                    info!("WebSocket client disconnected");
+                                    return;
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to serialize candle: {}", e);
+                                continue;
+                            }
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(count)) => {
+                        info!("WebSocket lagged by {} messages, continuing", count);
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        info!("Candle stream closed");
+                        return;
+                    }
+                }
+            }
+            // Handle incoming WebSocket messages (for ping/pong, close, etc.)
+            msg_result = socket.recv() => {
+                match msg_result {
+                    Some(Ok(axum::extract::ws::Message::Close(_))) => {
+                        info!("WebSocket client sent close message");
+                        return;
+                    }
+                    Some(Ok(axum::extract::ws::Message::Ping(data))) => {
+                        if socket.send(axum::extract::ws::Message::Pong(data)).await.is_err() {
+                            return;
+                        }
+                    }
+                    Some(Err(_)) => {
+                        info!("WebSocket client connection error");
+                        return;
+                    }
+                    None => {
+                        info!("WebSocket client disconnected");
+                        return;
+                    }
+                    _ => {
+                        // Ignore other message types
+                    }
+                }
+            }
         }
     }
 }
@@ -428,7 +494,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/balance", get(get_balance))
         .route("/open_orders", get(get_open_orders))
         .route("/trade_history", get(get_trade_history))
-        .route("/latest_session", get(get_latest_session))
+        .route("/session", get(get_latest_session))
+        .route("/session_stream", get(websocket_handler))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
 

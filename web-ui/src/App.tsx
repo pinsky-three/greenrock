@@ -1,11 +1,11 @@
 import {
   // AreaSeries,
   createChart,
-  CandlestickSeries,
   ColorType,
+  CandlestickSeries,
 } from "lightweight-charts";
-import type { Time } from "lightweight-charts";
-import { useEffect, useRef, useState } from "react";
+import type { Time, ISeriesApi } from "lightweight-charts";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 type Candle = {
   time: Time;
@@ -48,7 +48,7 @@ function convertApiCandlesToChart(apiCandles: ApiCandle[]): Candle[] {
 
 // Fetch latest session data from API
 async function fetchLatestSession(): Promise<LatestSessionResponse> {
-  const response = await fetch("http://localhost:4200/latest_session");
+  const response = await fetch("http://localhost:4200/session");
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -64,6 +64,7 @@ export const ChartComponent = (props: {
     areaBottomColor: string;
   };
   candleData?: Candle[];
+  onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
 }) => {
   const {
     colors: {
@@ -74,6 +75,7 @@ export const ChartComponent = (props: {
       areaBottomColor = "rgba(41, 98, 255, 0.28)",
     } = {},
     candleData,
+    onSeriesReady,
   } = props;
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -121,6 +123,11 @@ export const ChartComponent = (props: {
     // Use real data if available, otherwise fall back to generated data
     if (candleData && candleData.length > 0) {
       series.setData(candleData);
+    }
+
+    // Notify parent component that series is ready for real-time updates
+    if (onSeriesReady) {
+      onSeriesReady(series);
     }
 
     // const chartOptions = {
@@ -174,6 +181,7 @@ export const ChartComponent = (props: {
     areaTopColor,
     areaBottomColor,
     candleData,
+    onSeriesReady,
   ]);
 
   return <div ref={chartContainerRef} className="w-full h-full" />;
@@ -185,6 +193,11 @@ export default function App() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [candlestickSeries, setCandlestickSeries] =
+    useState<ISeriesApi<"Candlestick"> | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const isMountedRef = useRef(true);
 
   // Load data function
   const loadData = async () => {
@@ -201,14 +214,132 @@ export default function App() {
     }
   };
 
+  // WebSocket connection management
+  const connectWebSocket = useCallback(() => {
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN ||
+      wsRef.current?.readyState === WebSocket.CONNECTING
+    ) {
+      return; // Already connected or connecting
+    }
+
+    // Clean up any existing connection
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    try {
+      const ws = new WebSocket("ws://localhost:4200/session_stream");
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log("WebSocket connected");
+        if (isMountedRef.current) {
+          setIsConnected(true);
+          setError(null);
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const apiCandle: ApiCandle = JSON.parse(event.data);
+          console.log("Received candle:", apiCandle);
+
+          // Convert API candle to chart format
+          const chartCandle: Candle = {
+            time: Math.floor(apiCandle.timestamp / 1000) as Time,
+            open: apiCandle.open,
+            high: apiCandle.high,
+            low: apiCandle.low,
+            close: apiCandle.close,
+          };
+
+          // Update the chart with new candle data
+          if (candlestickSeries) {
+            candlestickSeries.update(chartCandle);
+          }
+        } catch (err) {
+          console.error("Failed to parse WebSocket message:", err);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        if (isMountedRef.current) {
+          setError("WebSocket connection error");
+        }
+      };
+
+      ws.onclose = (event) => {
+        console.log("WebSocket disconnected:", event.code, event.reason);
+
+        if (isMountedRef.current) {
+          setIsConnected(false);
+        }
+
+        // Clear the reference if this was the current connection
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
+
+        // Only attempt to reconnect if it wasn't a manual disconnection and component is still mounted
+        if (
+          event.code !== 1000 &&
+          event.code !== 1001 &&
+          isMountedRef.current
+        ) {
+          setTimeout(() => {
+            // Double-check we still need to reconnect
+            if (!wsRef.current && candlestickSeries && isMountedRef.current) {
+              connectWebSocket();
+            }
+          }, 3000);
+        }
+      };
+    } catch (err) {
+      console.error("Failed to create WebSocket connection:", err);
+      setError("Failed to establish WebSocket connection");
+    }
+  }, [candlestickSeries]);
+
+  // Disconnect WebSocket
+  const disconnectWebSocket = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close(1000, "Manual disconnect");
+      wsRef.current = null;
+      setIsConnected(false);
+    }
+  }, []);
+
   // Fetch data on component mount and set up auto-refresh
   useEffect(() => {
     loadData();
 
     // Auto-refresh every 30 seconds
-    const interval = setInterval(loadData, 30000);
+    const interval = setInterval(loadData, 60000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  // Handle WebSocket connection when chart series is ready
+  useEffect(() => {
+    if (candlestickSeries && !wsRef.current) {
+      connectWebSocket();
+    }
+  }, [candlestickSeries, connectWebSocket]);
+
+  // Cleanup WebSocket on component unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      disconnectWebSocket();
+    };
+  }, [disconnectWebSocket]);
+
+  // Handle series ready callback
+  const handleSeriesReady = useCallback((series: ISeriesApi<"Candlestick">) => {
+    setCandlestickSeries(series);
   }, []);
 
   // Convert API candles to chart format
@@ -238,19 +369,43 @@ export default function App() {
     <div className="h-screen w-screen bg-black text-white flex flex-col">
       {/* Header */}
       <header className="bg-black p-3 border-b border-gray-800 flex justify-between items-center">
-        <h1 className="text-xl font-medium text-gray-200">Trading Dashboard</h1>
+        <h1 className="text-xl font-medium text-gray-200">
+          Greenrock Dashboard
+        </h1>
         <div className="flex items-center space-x-3">
           {sessionData && (
             <span className="text-xs text-gray-500">
               Last updated: {new Date().toLocaleTimeString()}
             </span>
           )}
+          <div className="flex items-center space-x-2">
+            <div
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? "bg-green-400" : "bg-red-400"
+              }`}
+            ></div>
+            <span className="text-xs text-gray-500">
+              {isConnected ? "Live" : "Disconnected"}
+            </span>
+          </div>
           <button
             onClick={loadData}
             disabled={loading}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-3 py-1.5 rounded text-xs font-medium"
           >
             {loading ? "Refreshing..." : "Refresh"}
+          </button>
+          <button
+            onClick={() =>
+              isConnected ? disconnectWebSocket() : connectWebSocket()
+            }
+            className={`px-3 py-1.5 rounded text-xs font-medium ${
+              isConnected
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-green-600 hover:bg-green-700"
+            }`}
+          >
+            {isConnected ? "Disconnect" : "Connect"}
           </button>
         </div>
       </header>
@@ -303,6 +458,7 @@ export default function App() {
                 areaBottomColor: "#000000",
               }}
               candleData={chartData}
+              onSeriesReady={handleSeriesReady}
             />
           )}
         </main>

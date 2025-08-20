@@ -70,6 +70,14 @@ where
             .await
     }
 
+    pub async fn candles_stream(
+        &self,
+        symbol: &str,
+        interval: &str,
+    ) -> tokio::sync::broadcast::Receiver<Candle> {
+        self.broker.candle_stream(symbol, interval)
+    }
+
     pub async fn run_with_cancel_signal(
         &self,
         mut init_state: State,
