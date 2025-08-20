@@ -30,6 +30,8 @@ use greenrock::{
     strategy::core::{MinimalStrategy, Strategy},
 };
 
+use serde_json::json;
+
 use polars::frame::DataFrame;
 // use polars::prelude::{IntoLazy, col};
 use serde::{Deserialize, Serialize};
@@ -158,7 +160,7 @@ async fn chat(State(state): State<AppState>, Json(params): Json<ChatRequest>) ->
 }
 
 async fn get_balance(State(state): State<AppState>) -> Response {
-    match tokio::task::spawn_blocking(move || state.runner.balance()).await {
+    match tokio::task::spawn_blocking(move || state.live_loop_runner.balance()).await {
         Ok(balance) => Json(balance).into_response(),
         Err(e) => {
             error!("Failed to get balance: {}", e);
@@ -168,7 +170,7 @@ async fn get_balance(State(state): State<AppState>) -> Response {
 }
 
 async fn get_open_orders(State(state): State<AppState>, symbol: Query<String>) -> Response {
-    match tokio::task::spawn_blocking(move || state.runner.open_orders(&symbol)).await {
+    match tokio::task::spawn_blocking(move || state.live_loop_runner.open_orders(&symbol)).await {
         Ok(orders) => Json(orders).into_response(),
         Err(e) => {
             error!("Failed to get open orders: {}", e);
@@ -178,7 +180,7 @@ async fn get_open_orders(State(state): State<AppState>, symbol: Query<String>) -
 }
 
 async fn get_trade_history(State(state): State<AppState>, symbol: Query<String>) -> Response {
-    match tokio::task::spawn_blocking(move || state.runner.trade_history(&symbol)).await {
+    match tokio::task::spawn_blocking(move || state.live_loop_runner.trade_history(&symbol)).await {
         Ok(history) => Json(history).into_response(),
         Err(e) => {
             error!("Failed to get trade history: {}", e);
@@ -191,7 +193,7 @@ async fn get_trade_history(State(state): State<AppState>, symbol: Query<String>)
 struct AppState {
     flow_runner: Arc<FlowRunner>,
     session_storage: Arc<dyn SessionStorage>,
-    runner: Arc<Runner<HashMap<String, f64>, BinanceBroker>>,
+    live_loop_runner: Arc<Runner<HashMap<String, f64>, BinanceBroker>>,
 }
 
 async fn setup_graph(
@@ -353,6 +355,31 @@ async fn setup_graph(
     Ok(())
 }
 
+async fn get_latest_session(State(state): State<AppState>) -> Response {
+    // Get candles asynchronously
+    let candles_result = state
+        .live_loop_runner
+        .candles("BTCUSDT", "1m", 1000, None, None)
+        .await;
+
+    // Get balance in blocking task
+    let balance_result =
+        tokio::task::spawn_blocking(move || state.live_loop_runner.balance()).await;
+
+    match (candles_result, balance_result) {
+        (candles, Ok(balance)) => Json(json!({
+            "session_id": Uuid::new_v4().to_string(),
+            "candles": candles,
+            "balance": balance,
+        }))
+        .into_response(),
+        (_, Err(e)) => {
+            error!("Failed to get balance: {}", e);
+            internal_error("Failed to get balance")
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
@@ -388,7 +415,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState {
         flow_runner,
         session_storage,
-        runner: runner.clone(),
+        live_loop_runner: runner.clone(),
     };
 
     let cors = CorsLayer::new()
@@ -401,6 +428,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/balance", get(get_balance))
         .route("/open_orders", get(get_open_orders))
         .route("/trade_history", get(get_trade_history))
+        .route("/latest_session", get(get_latest_session))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
 

@@ -11,7 +11,7 @@ use tracing::info;
 
 use crate::{
     brokers::{binance::BinanceBroker, core::Broker},
-    models::timeseries::CandleRing,
+    models::timeseries::{Candle, CandleRing},
     strategy::core::{Strategy, StrategyAction, StrategyContext},
 };
 
@@ -55,6 +55,19 @@ where
 
     pub fn market_current_price(&self, symbol: &str) -> f64 {
         self.broker.market_current_price(symbol)
+    }
+
+    pub async fn candles(
+        &self,
+        symbol: &str,
+        interval: &str,
+        limit: u16,
+        start_time: Option<DateTime<Utc>>,
+        end_time: Option<DateTime<Utc>>,
+    ) -> Vec<Candle> {
+        self.broker
+            .candles(symbol, interval, limit, start_time, end_time)
+            .await
     }
 
     pub async fn run_with_cancel_signal(
