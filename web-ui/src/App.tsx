@@ -2,6 +2,7 @@ import {
   // AreaSeries,
   createChart,
   CandlestickSeries,
+  ColorType,
 } from "lightweight-charts";
 import type { Time } from "lightweight-charts";
 import { useEffect, useRef } from "react";
@@ -128,21 +129,35 @@ export const ChartComponent = (props: {
     };
 
     const chart = createChart(chartContainerRef.current!, {
-      // layout: {
-      //   background: { type: ColorType.Solid, color: backgroundColor },
-      //   textColor,
-      // },
-
+      layout: {
+        background: { type: ColorType.Solid, color: "#000000" },
+        textColor: "#ffffff",
+      },
+      grid: {
+        vertLines: {
+          color: "#1a1a1a",
+        },
+        horzLines: {
+          color: "#1a1a1a",
+        },
+      },
+      timeScale: {
+        borderColor: "#333333",
+        timeVisible: true,
+      },
+      rightPriceScale: {
+        borderColor: "#333333",
+      },
       width: chartContainerRef.current?.clientWidth,
       height: chartContainerRef.current?.clientHeight || 400,
     });
 
     const series = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a",
-      downColor: "#ef5350",
+      upColor: "#00ff88",
+      downColor: "#ff4444",
       borderVisible: false,
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
+      wickUpColor: "#00ff88",
+      wickDownColor: "#ff4444",
     });
 
     const data = generateData(2500, 20, 1000);
@@ -232,11 +247,11 @@ export default function App() {
         <main className="flex-1 bg-black">
           <ChartComponent
             colors={{
-              backgroundColor: "black",
-              lineColor: "#2962FF",
-              textColor: "white",
-              areaTopColor: "#2962FF",
-              areaBottomColor: "rgba(41, 98, 255, 0.28)",
+              backgroundColor: "#000000",
+              lineColor: "#ffffff",
+              textColor: "#ffffff",
+              areaTopColor: "#000000",
+              areaBottomColor: "#000000",
             }}
           />
         </main>
