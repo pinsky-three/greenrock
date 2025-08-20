@@ -3,7 +3,7 @@ use std::{collections::HashMap, env, sync::Arc};
 use axum::{
     Json, Router,
     extract::{Query, State},
-    http::StatusCode,
+    http::{Method, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -36,6 +36,9 @@ use serde::{Deserialize, Serialize};
 
 use tracing::{Level, error, info};
 use uuid::Uuid;
+
+use tower::ServiceBuilder;
+use tower_http::cors::{Any, CorsLayer};
 
 async fn health_check() -> &'static str {
     "OK"
@@ -388,20 +391,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         runner: runner.clone(),
     };
 
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST])
+        .allow_origin(Any);
+
     let app: Router = Router::new()
         .route("/health", get(health_check))
         .route("/chat", post(chat))
         .route("/balance", get(get_balance))
         .route("/open_orders", get(get_open_orders))
         .route("/trade_history", get(get_trade_history))
+        .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
 
     info!("Starting both web server and trading runner...");
 
     // Spawn the web server task
     let web_server_handle = tokio::spawn(async move {
-        info!("Greenrock chat service is running on: http://localhost:8000");
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
+        info!("Greenrock chat service is running on: http://localhost:4200");
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:4200").await.unwrap();
         axum::serve(listener, app).await.unwrap();
     });
 
