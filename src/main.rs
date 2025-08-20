@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, sync::Arc};
 
 use axum::{
     Json, Router,
-    extract::State,
+    extract::{Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -160,6 +160,26 @@ async fn get_balance(State(state): State<AppState>) -> Response {
         Err(e) => {
             error!("Failed to get balance: {}", e);
             internal_error("Failed to get balance")
+        }
+    }
+}
+
+async fn get_open_orders(State(state): State<AppState>, symbol: Query<String>) -> Response {
+    match tokio::task::spawn_blocking(move || state.runner.open_orders(&symbol)).await {
+        Ok(orders) => Json(orders).into_response(),
+        Err(e) => {
+            error!("Failed to get open orders: {}", e);
+            internal_error("Failed to get open orders")
+        }
+    }
+}
+
+async fn get_trade_history(State(state): State<AppState>, symbol: Query<String>) -> Response {
+    match tokio::task::spawn_blocking(move || state.runner.trade_history(&symbol)).await {
+        Ok(history) => Json(history).into_response(),
+        Err(e) => {
+            error!("Failed to get trade history: {}", e);
+            internal_error("Failed to get trade history")
         }
     }
 }
@@ -372,6 +392,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/health", get(health_check))
         .route("/chat", post(chat))
         .route("/balance", get(get_balance))
+        .route("/open_orders", get(get_open_orders))
+        .route("/trade_history", get(get_trade_history))
         .with_state(state);
 
     info!("Starting both web server and trading runner...");
