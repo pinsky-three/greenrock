@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
+use binance::model::{Order, TradeHistory};
 use chrono::{DateTime, Duration, Utc};
 use polars::frame::DataFrame;
-
+// use ta::{DataItem, Next, indicators::MovingAverageConvergenceDivergence};
 use tokio::signal;
 
 use tokio_util::sync::CancellationToken;
@@ -14,10 +15,12 @@ use crate::{
     strategy::core::{Strategy, StrategyAction, StrategyContext},
 };
 
-pub struct Runner<State>
+pub struct Runner<State, B>
 where
+    B: Broker + Send + Sync,
     State: Clone,
 {
+    broker: B,
     strategy: Box<dyn Strategy<State = State>>,
 }
 
@@ -29,15 +32,32 @@ pub struct RunConfig {
     // pub end_time: Option<DateTime<Utc>>,
 }
 
-impl<State> Runner<State>
+impl<State, B> Runner<State, B>
 where
     State: Clone + Default,
+    B: Broker + Send + Sync,
 {
-    pub fn new(strategy: Box<dyn Strategy<State = State>>) -> Self {
-        Self { strategy }
+    pub fn new(broker: B, strategy: Box<dyn Strategy<State = State>>) -> Self {
+        Self { broker, strategy }
     }
 
-    pub async fn run_with_token(
+    pub fn open_orders(&self, symbol: &str) -> Vec<Order> {
+        self.broker.open_orders(symbol)
+    }
+
+    pub fn trade_history(&self, symbol: &str) -> Vec<TradeHistory> {
+        self.broker.trade_history(symbol)
+    }
+
+    pub fn balance(&self) -> HashMap<String, f64> {
+        self.broker.balance()
+    }
+
+    pub fn market_current_price(&self, symbol: &str) -> f64 {
+        self.broker.market_current_price(symbol)
+    }
+
+    pub async fn run_with_cancel_signal(
         &self,
         mut init_state: State,
         config: &RunConfig,
@@ -158,6 +178,6 @@ where
             cancel_clone.cancel();
         });
 
-        self.run_with_token(state, config, cancel).await
+        self.run_with_cancel_signal(state, config, cancel).await
     }
 }

@@ -46,7 +46,7 @@ pub struct StrategyContext {
 //     }
 // }
 
-pub trait Strategy {
+pub trait Strategy: Send + Sync {
     type State: Clone + Default;
 
     fn init(
@@ -64,7 +64,7 @@ pub trait Strategy {
     fn tick(
         &self,
         ctx: &mut StrategyContext,
-        timestamp: DateTime<Utc>,
+        at: DateTime<Utc>,
         state: &mut Self::State,
         symbol: String,
         data_scope: Vec<Candle>,
@@ -164,8 +164,16 @@ impl Strategy for MinimalStrategy {
 
         let last_timestamp = state.get("last_timestamp").unwrap_or(&0_f64);
 
+        let binding_trend = st.trend as f64;
+        let last_trend = state.get("last_trend").unwrap_or(&binding_trend);
+
         if st.trend == 1 && timestamp.timestamp() != last_timestamp.to_i64().unwrap() {
+            if last_trend == &(st.trend as f64) {
+                return StrategyAction::Pass;
+            }
+
             state.insert("last_timestamp".to_string(), timestamp.timestamp() as f64);
+            state.insert("last_trend".to_string(), st.trend as f64);
 
             return StrategyAction::Emitted(Box::new(TradingAction {
                 id: "sell".to_string(),

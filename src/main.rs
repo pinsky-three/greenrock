@@ -1,4 +1,4 @@
-use std::{env, sync::Arc, time::Duration};
+use std::{collections::HashMap, env, sync::Arc};
 
 use axum::{
     Json, Router,
@@ -8,14 +8,13 @@ use axum::{
     routing::{get, post},
 };
 
-use chrono::{DateTime, TimeDelta, Utc};
 use graph_flow::{
     Context, ExecutionStatus, FlowRunner, GraphBuilder, GraphStorage, InMemoryGraphStorage,
     PostgresSessionStorage, Session, SessionStorage, Task,
 };
 
 use greenrock::{
-    brokers::{binance::BinanceBroker, core::Broker},
+    brokers::binance::BinanceBroker,
     processor::tasks::{
         binance_operations_task::BinanceOperationsTask,
         binance_reporting_task::BinanceReportingTask, entry_interaction_task::EntryInteractionTask,
@@ -34,11 +33,7 @@ use greenrock::{
 use polars::frame::DataFrame;
 // use polars::prelude::{IntoLazy, col};
 use serde::{Deserialize, Serialize};
-use ta::{
-    DataItem,
-    indicators::{AverageTrueRange, ExponentialMovingAverage, MovingAverageConvergenceDivergence},
-};
-use ta::{Next, indicators::StandardDeviation};
+
 use tracing::{Level, error, info};
 use uuid::Uuid;
 
@@ -101,7 +96,7 @@ async fn chat(State(state): State<AppState>, Json(params): Json<ChatRequest>) ->
 
     let session = Session {
         id: session_id.clone(),
-        graph_id: "default".to_string(),
+        graph_id: "".to_string(),
         current_task_id: reply_task_id.to_string(),
         status_message: None,
         context,
@@ -159,16 +154,27 @@ async fn chat(State(state): State<AppState>, Json(params): Json<ChatRequest>) ->
     }
 }
 
+async fn get_balance(State(state): State<AppState>) -> Response {
+    match tokio::task::spawn_blocking(move || state.runner.balance()).await {
+        Ok(balance) => Json(balance).into_response(),
+        Err(e) => {
+            error!("Failed to get balance: {}", e);
+            internal_error("Failed to get balance")
+        }
+    }
+}
+
 #[derive(Clone)]
 struct AppState {
     flow_runner: Arc<FlowRunner>,
     session_storage: Arc<dyn SessionStorage>,
+    runner: Arc<Runner<HashMap<String, f64>, BinanceBroker>>,
 }
 
 async fn setup_graph(
     graph_storage: Arc<dyn GraphStorage>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Setting up recommendation workflow graph");
+    info!("Setting up greenrock workflow graph");
 
     let entry_interaction_task: Arc<dyn Task> = Arc::new(EntryInteractionTask::new("".to_string()));
 
@@ -283,6 +289,38 @@ async fn setup_graph(
                 portfolio_reporting_task_id.clone(),
                 reply_generation_task_id.clone(),
             )
+            .add_edge(
+                regimen_selection_task_id.clone(),
+                reply_generation_task_id.clone(),
+            )
+            .add_edge(
+                binance_operations_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                portfolio_selection_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                portfolio_aggregation_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                regimen_aggregation_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                regimen_switching_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                regimen_evaluation_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
+            .add_edge(
+                regimen_reporting_task_id.clone(),
+                regimen_selection_task_id.clone(),
+            )
             .build(),
     );
 
@@ -301,69 +339,81 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compact()
         .init();
 
-    // info!("Starting greenrock chat service");
+    info!("Starting greenrock chat service");
 
-    // let database_url =
-    //     env::var("DATABASE_URL").map_err(|_| "DATABASE_URL environment variable not set")?;
+    let database_url =
+        env::var("DATABASE_URL").map_err(|_| "DATABASE_URL environment variable not set")?;
 
-    // let session_storage: Arc<dyn SessionStorage> =
-    //     Arc::new(PostgresSessionStorage::connect(&database_url).await?);
+    let session_storage: Arc<dyn SessionStorage> =
+        Arc::new(PostgresSessionStorage::connect(&database_url).await?);
 
-    // let graph_storage: Arc<dyn GraphStorage> = Arc::new(InMemoryGraphStorage::new());
+    let graph_storage: Arc<dyn GraphStorage> = Arc::new(InMemoryGraphStorage::new());
 
-    // setup_graph(graph_storage.clone()).await?;
+    setup_graph(graph_storage.clone()).await?;
 
-    // // Get the graph for FlowRunner
-    // let graph = graph_storage.get("").await?.ok_or(" graph not found")?;
+    let graph = graph_storage.get("").await?.ok_or(" graph not found")?;
 
-    // // Create FlowRunner
-    // let flow_runner = Arc::new(FlowRunner::new(graph, session_storage.clone()));
-
-    // let state = AppState {
-    //     flow_runner,
-    //     session_storage,
-    // };
-
-    // let app = Router::new()
-    //     .route("/health", get(health_check))
-    //     .route("/chat", post(chat))
-    //     .with_state(state);
-
-    // // run our app with hyper, listening globally on port 3000
-    // let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
-    // axum::serve(listener, app).await.unwrap();
-
-    // info!("Greenrock chat service is running on: http://localhost:8000");
-
-    // let total_candles = binance_broker
-    //     .candles(
-    //         "BTCUSDT",
-    //         "1m",
-    //         1000,
-    //         Some(Utc::now() - Duration::from_secs(60 * 60 * 24)),
-    //         Some(Utc::now()),
-    //     )
-    //     .await;
-
-    // info!("total candles: {}", total_candles.len());
+    let flow_runner = Arc::new(FlowRunner::new(graph.clone(), session_storage.clone()));
 
     let strategy = Box::new(MinimalStrategy::new(DataFrame::new(vec![]).unwrap()));
     let initial_state = strategy.default_state();
 
-    let runner = Runner::new(strategy);
+    let binance_broker = BinanceBroker::default();
 
-    runner
-        .run_until_ctrl_c(
-            &RunConfig {
-                symbol: "BTCUSDT".to_string(),
-                interval: "1m".to_string(),
-            },
-            initial_state,
-        )
-        .await;
+    let runner = Arc::new(Runner::new(binance_broker, strategy));
 
-    // Keep process alive; Ctrl-C to quit
-    // tokio::signal::ctrl_c().await?;
+    let state = AppState {
+        flow_runner,
+        session_storage,
+        runner: runner.clone(),
+    };
+
+    let app: Router = Router::new()
+        .route("/health", get(health_check))
+        .route("/chat", post(chat))
+        .route("/balance", get(get_balance))
+        .with_state(state);
+
+    info!("Starting both web server and trading runner...");
+
+    // Spawn the web server task
+    let web_server_handle = tokio::spawn(async move {
+        info!("Greenrock chat service is running on: http://localhost:8000");
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    // Spawn the trading runner task
+    let trading_runner_handle = tokio::spawn(async move {
+        info!("Starting trading runner for BTCUSDT...");
+        runner
+            .run_until_ctrl_c(
+                &RunConfig {
+                    symbol: "BTCUSDT".to_string(),
+                    interval: "1m".to_string(),
+                },
+                initial_state,
+            )
+            .await;
+    });
+
+    // Wait for Ctrl+C or either task to complete
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            info!("Received Ctrl+C, shutting down gracefully...");
+        }
+        result = web_server_handle => {
+            if let Err(e) = result {
+                error!("Web server task failed: {}", e);
+            }
+        }
+        result = trading_runner_handle => {
+            if let Err(e) = result {
+                error!("Trading runner task failed: {}", e);
+            }
+        }
+    }
+
     info!("shutting down");
 
     Ok(())

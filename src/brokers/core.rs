@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use binance::model::{Order, TradeHistory};
 use chrono::{DateTime, Utc};
 
 pub trait Broker {
@@ -18,4 +19,6 @@ pub trait Broker {
         from: Option<DateTime<Utc>>,
         to: Option<DateTime<Utc>>,
     ) -> impl std::future::Future<Output = Vec<crate::models::timeseries::Candle>> + Send;
+    fn open_orders(&self, symbol: &str) -> Vec<Order>;
+    fn trade_history(&self, symbol: &str) -> Vec<TradeHistory>;
 }

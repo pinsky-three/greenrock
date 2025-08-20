@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 
-use binance::model::KlineSummaries;
+use binance::model::{KlineSummaries, Order, TradeHistory};
 use binance::{account::Account, api::Binance, market::Market};
 use chrono::{DateTime, Utc};
 use tracing::{error, info};
@@ -9,6 +9,7 @@ use tracing::{error, info};
 use crate::brokers::core::Broker;
 use crate::models::timeseries::Candle;
 
+#[derive(Clone)]
 pub struct BinanceBroker {}
 
 use futures_util::{SinkExt, StreamExt};
@@ -19,28 +20,37 @@ use tokio_tungstenite::tungstenite::Message;
 
 impl Broker for BinanceBroker {
     fn balance(&self) -> HashMap<String, f64> {
-        let api_key = Some(env::var("BINANCE_API_KEY").unwrap());
-        let secret_key = Some(env::var("BINANCE_SECRET_KEY").unwrap());
+        // Note: This method should ideally be async, but the trait requires sync
+        // The caller should wrap this in spawn_blocking
+        let api_key = env::var("BINANCE_API_KEY").ok();
+        let secret_key = env::var("BINANCE_SECRET_KEY").ok();
+
+        if api_key.is_none() || secret_key.is_none() {
+            error!("Binance API credentials not found");
+            return HashMap::new();
+        }
+
         let account: Account = Binance::new(api_key, secret_key);
+
         match account.get_account() {
             Ok(answer) => {
                 let res = answer
                     .balances
                     .iter()
-                    .filter(|instrument| instrument.locked.parse::<f64>().unwrap() > 0.0)
+                    .filter(|instrument| instrument.free.parse::<f64>().unwrap_or(0.0) > 0.0)
                     .collect::<Vec<_>>();
 
                 res.iter()
                     .map(|instrument| {
                         (
                             instrument.asset.clone(),
-                            instrument.free.parse::<f64>().unwrap(),
+                            instrument.free.parse::<f64>().unwrap_or(0.0),
                         )
                     })
                     .collect()
             }
             Err(e) => {
-                println!("Error: {e}");
+                error!("Failed to get balance: {}", e);
                 HashMap::new()
             }
         }
@@ -48,7 +58,13 @@ impl Broker for BinanceBroker {
 
     fn market_current_price(&self, symbol: &str) -> f64 {
         let market: Market = Binance::new(None, None);
-        market.get_price(symbol).unwrap().price
+        match market.get_price(symbol) {
+            Ok(price) => price.price,
+            Err(e) => {
+                error!("Failed to get market price for {}: {}", symbol, e);
+                0.0
+            }
+        }
     }
 
     fn candle_stream(
@@ -157,6 +173,44 @@ impl Broker for BinanceBroker {
         })
         .await
         .unwrap()
+    }
+
+    fn open_orders(&self, symbol: &str) -> Vec<Order> {
+        let api_key = env::var("BINANCE_API_KEY").ok();
+        let secret_key = env::var("BINANCE_SECRET_KEY").ok();
+
+        if api_key.is_none() || secret_key.is_none() {
+            error!("Binance API credentials not found");
+            return Vec::new();
+        }
+
+        let account: Account = Binance::new(api_key, secret_key);
+        match account.get_open_orders(symbol) {
+            Ok(orders) => orders,
+            Err(e) => {
+                error!("Failed to get open orders: {}", e);
+                Vec::new()
+            }
+        }
+    }
+
+    fn trade_history(&self, symbol: &str) -> Vec<TradeHistory> {
+        let api_key = env::var("BINANCE_API_KEY").ok();
+        let secret_key = env::var("BINANCE_SECRET_KEY").ok();
+
+        if api_key.is_none() || secret_key.is_none() {
+            error!("Binance API credentials not found");
+            return Vec::new();
+        }
+
+        let account: Account = Binance::new(api_key, secret_key);
+        match account.trade_history(symbol) {
+            Ok(history) => history,
+            Err(e) => {
+                error!("Failed to get trade history: {}", e);
+                Vec::new()
+            }
+        }
     }
 }
 
