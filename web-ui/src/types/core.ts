@@ -27,3 +27,18 @@ export type LatestSessionResponse = {
   candles: ApiCandle[];
   balance: Balance;
 };
+
+export type TimeRange = {
+  start: Date;
+  end: Date;
+};
+
+export type TimeRangePreset = {
+  label: string;
+  start: Date;
+  end: Date;
+};
+
+export type TimeRangePresets = {
+  [key: string]: TimeRangePreset;
+};

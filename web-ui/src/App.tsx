@@ -5,9 +5,15 @@ import type {
   Balance,
   Candle,
   LatestSessionResponse,
+  TimeRange,
 } from "./types/core";
 import { ChartComponent } from "./components/Chart";
-import { convertApiCandlesToChart, fetchLatestSession } from "./utils/core";
+import {
+  convertApiCandlesToChart,
+  fetchLatestSession,
+  filterCandlesByTimeRange,
+  getTimeRangePresets,
+} from "./utils/core";
 
 export default function App() {
   const [sessionData, setSessionData] = useState<LatestSessionResponse | null>(
@@ -18,6 +24,14 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [candlestickSeries, setCandlestickSeries] =
     useState<ISeriesApi<"Candlestick"> | null>(null);
+
+  // Time range state
+  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
+    const presets = getTimeRangePresets();
+    return { start: presets["4h"].start, end: presets["4h"].end };
+  });
+  const [timeRangePreset, setTimeRangePreset] = useState<string>("4h");
+
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
 
@@ -169,9 +183,32 @@ export default function App() {
     [candlestickSeries]
   );
 
-  // Convert API candles to chart format
+  // Handle time range selection
+  const handleTimeRangeChange = useCallback((preset: string) => {
+    const presets = getTimeRangePresets();
+    const selectedPreset = presets[preset];
+    if (selectedPreset) {
+      setSelectedTimeRange({
+        start: selectedPreset.start,
+        end: selectedPreset.end,
+      });
+      setTimeRangePreset(preset);
+    }
+  }, []);
+
+  // Handle custom time range
+  const handleCustomTimeRange = useCallback((start: Date, end: Date) => {
+    setSelectedTimeRange({ start, end });
+    setTimeRangePreset("custom");
+  }, []);
+
+  // Convert API candles to chart format and apply time filter
   const chartData = sessionData
-    ? convertApiCandlesToChart(sessionData.candles)
+    ? filterCandlesByTimeRange(
+        convertApiCandlesToChart(sessionData.candles),
+        selectedTimeRange.start,
+        selectedTimeRange.end
+      )
     : undefined;
 
   // Calculate portfolio value from balance
@@ -196,9 +233,60 @@ export default function App() {
     <div className="h-screen w-screen bg-black text-white flex flex-col">
       {/* Header */}
       <header className="bg-black p-3 border-b border-gray-800 flex justify-between items-center">
-        <h1 className="text-xl font-medium text-gray-200">
-          Greenrock Dashboard
-        </h1>
+        <div className="flex items-center space-x-6">
+          <h1 className="text-xl font-medium text-gray-200">
+            Greenrock Dashboard
+          </h1>
+
+          {/* Time Range Controls */}
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-gray-500">Time Range:</span>
+            <select
+              value={timeRangePreset}
+              onChange={(e) => handleTimeRangeChange(e.target.value)}
+              className="bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-700 focus:border-blue-500 focus:outline-none"
+            >
+              {Object.entries(getTimeRangePresets()).map(([key, preset]) => (
+                <option key={key} value={key}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Custom date inputs for fine control */}
+            {timeRangePreset === "custom" && (
+              <div className="flex items-center space-x-2 ml-3">
+                <input
+                  type="datetime-local"
+                  value={selectedTimeRange.start.toISOString().slice(0, 16)}
+                  onChange={(e) => {
+                    const newStart = new Date(e.target.value);
+                    handleCustomTimeRange(newStart, selectedTimeRange.end);
+                  }}
+                  className="bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-700 focus:border-blue-500 focus:outline-none"
+                />
+                <span className="text-xs text-gray-500">to</span>
+                <input
+                  type="datetime-local"
+                  value={selectedTimeRange.end.toISOString().slice(0, 16)}
+                  onChange={(e) => {
+                    const newEnd = new Date(e.target.value);
+                    handleCustomTimeRange(selectedTimeRange.start, newEnd);
+                  }}
+                  className="bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-700 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            )}
+
+            {/* Data count indicator */}
+            {chartData && (
+              <span className="text-xs text-gray-500 ml-4">
+                Showing {chartData.length} candles
+              </span>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center space-x-3">
           {sessionData && (
             <span className="text-xs text-gray-500">
@@ -286,6 +374,7 @@ export default function App() {
               }}
               candleData={chartData}
               onSeriesReady={handleSeriesReady}
+              autoFitContent={true}
             />
           )}
         </main>

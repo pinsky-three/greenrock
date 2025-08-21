@@ -18,8 +18,9 @@ export const ChartComponent = (props: {
   };
   candleData?: Candle[];
   onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
+  autoFitContent?: boolean;
 }) => {
-  const { candleData, onSeriesReady } = props;
+  const { candleData, onSeriesReady, autoFitContent = true } = props;
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
 
@@ -95,8 +96,13 @@ export const ChartComponent = (props: {
   useEffect(() => {
     if (seriesRef.current && candleData && candleData.length > 0) {
       seriesRef.current.setData(candleData);
+
+      // Auto-fit content when data changes if enabled
+      if (autoFitContent && chartRef.current) {
+        chartRef.current.timeScale().fitContent();
+      }
     }
-  }, [candleData]);
+  }, [candleData, autoFitContent]);
 
   // Cleanup on unmount
   useEffect(() => {
