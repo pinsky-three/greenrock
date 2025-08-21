@@ -8,6 +8,7 @@ use axum::{
     routing::{get, get_service, post},
 };
 
+use chrono::DateTime;
 use graph_flow::{
     Context, ExecutionStatus, FlowRunner, GraphBuilder, GraphStorage, InMemoryGraphStorage,
     PostgresSessionStorage, Session, SessionStorage, Task,
@@ -67,6 +68,14 @@ struct PauseResponse {
     status: String,
     next_task: String,
     reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CandlesQuery {
+    symbol: String,
+    interval: String,
+    start: Option<String>,
+    end: Option<String>,
 }
 
 fn internal_error(message: &str) -> Response {
@@ -367,38 +376,75 @@ async fn setup_graph(
     Ok(())
 }
 
-async fn get_latest_session(State(state): State<AppState>) -> Response {
-    // Get candles asynchronously
-    let candles_result = state
-        .live_loop_runner
-        .candles(
-            &state.greenrock_session.symbol.clone(),
-            &state.greenrock_session.interval.clone(),
-            500,
-            None,
-            None,
-        )
-        .await;
+// async fn get_latest_session(State(state): State<AppState>) -> Response {
+//     // Get candles asynchronously
+//     // let candles_result = state
+//     //     .live_loop_runner
+//     //     .candles(
+//     //         &state.greenrock_session.symbol.clone(),
+//     //         &state.greenrock_session.interval.clone(),
+//     //         500,
+//     //         None,
+//     //         None,
+//     //     )
+//     //     .await;
 
-    // Get balance in blocking task
-    let balance_result =
-        tokio::task::spawn_blocking(move || state.live_loop_runner.balance()).await;
+//     // Get balance in blocking task
+//     let balance_result =
+//         tokio::task::spawn_blocking(move || state.live_loop_runner.balance()).await;
 
-    match (candles_result, balance_result) {
-        (candles, Ok(balance)) => Json(json!({
-            "session_id": Uuid::new_v4().to_string(),
-            "candles": candles,
-            "balance": balance,
-        }))
-        .into_response(),
-        (_, Err(e)) => {
-            error!("Failed to get balance: {}", e);
-            internal_error("Failed to get balance")
+//     match (candles_result, balance_result) {
+//         (candles, Ok(balance)) => Json(json!({
+//             "session_id": Uuid::new_v4().to_string(),
+//             // "candles": candles,
+//             "balance": balance,
+//         }))
+//         .into_response(),
+//         (_, Err(e)) => {
+//             error!("Failed to get balance: {}", e);
+//             internal_error("Failed to get balance")
+//         }
+//     }
+// }
+
+async fn get_portfolio(State(state): State<AppState>) -> Response {
+    match tokio::task::spawn_blocking(move || state.live_loop_runner.balance()).await {
+        Ok(portfolio) => Json(portfolio).into_response(),
+        Err(e) => {
+            error!("Failed to get portfolio: {}", e);
+            internal_error("Failed to get portfolio")
         }
     }
 }
 
-async fn websocket_handler(State(state): State<AppState>, ws: WebSocketUpgrade) -> Response {
+async fn get_candles(
+    State(state): State<AppState>,
+    Query(params): Query<CandlesQuery>,
+) -> Response {
+    let candles = state
+        .live_loop_runner
+        .candles(
+            &params.symbol,
+            &params.interval,
+            500,
+            params
+                .start
+                .as_ref()
+                .map(|s| DateTime::parse_from_rfc3339(s).unwrap().to_utc()),
+            params
+                .end
+                .as_ref()
+                .map(|e| DateTime::parse_from_rfc3339(e).unwrap().to_utc()),
+        )
+        .await;
+
+    Json(json!({
+        "candles": candles,
+    }))
+    .into_response()
+}
+
+async fn get_candle_stream(State(state): State<AppState>, ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 
@@ -525,8 +571,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/balance", get(get_balance))
         .route("/open_orders", get(get_open_orders))
         .route("/trade_history", get(get_trade_history))
-        .route("/session", get(get_latest_session))
-        .route("/session_stream", get(websocket_handler))
+        .route("/get_portfolio", get(get_portfolio))
+        .route("/get_candles", get(get_candles))
+        .route("/session_stream", get(get_candle_stream))
         .fallback_service(get_service(ServeDir::new("web-ui/dist")))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
