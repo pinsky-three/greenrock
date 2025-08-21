@@ -112,11 +112,11 @@ export const ChartComponent = (props: {
       });
 
       const series = chart.addSeries(CandlestickSeries, {
-        upColor: "#00ff88",
-        downColor: "#ff4444",
+        upColor: "#00a6a5",
+        downColor: "#ff1e38",
         borderVisible: false,
-        wickUpColor: "#00ff88",
-        wickDownColor: "#ff4444",
+        wickUpColor: "#00a6a5",
+        wickDownColor: "#ff1e38",
       });
 
       chartRef.current = chart;

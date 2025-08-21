@@ -28,5 +28,5 @@ tokio-tungstenite = { version = "0.24.0", features = [
 futures-util = "0.3.31"
 tokio-util = { version = "0.7.12", features = ["rt"] }
 ta = "0.5.0"
-tower-http = { version = "0.6.6", features = ["cors"] }
+tower-http = { version = "0.6.6", features = ["cors", "fs"] }
 tower = "0.5.2"

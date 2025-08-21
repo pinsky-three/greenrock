@@ -5,7 +5,7 @@ use axum::{
     extract::{Query, State, WebSocketUpgrade, ws::WebSocket},
     http::{Method, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, get_service, post},
 };
 
 use graph_flow::{
@@ -42,6 +42,7 @@ use uuid::Uuid;
 
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 
 async fn health_check() -> &'static str {
     "OK"
@@ -192,11 +193,11 @@ async fn get_trade_history(State(state): State<AppState>, symbol: Query<String>)
 
 // #[derive(Clone)]
 struct GreenrockSession {
-    id: Uuid,
+    _id: Uuid,
     symbol: String,
     interval: String,
-    candles: Vec<Candle>,
-    balance: HashMap<String, f64>,
+    _candles: Vec<Candle>,
+    _balance: HashMap<String, f64>,
 }
 
 #[derive(Clone)]
@@ -506,11 +507,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         session_storage,
         live_loop_runner: runner.clone(),
         greenrock_session: Arc::new(GreenrockSession {
-            id: Uuid::new_v4(),
+            _id: Uuid::new_v4(),
             symbol: "BTCUSDT".to_string(),
             interval: "1m".to_string(),
-            candles: vec![],
-            balance: HashMap::new(),
+            _candles: vec![],
+            _balance: HashMap::new(),
         }),
     };
 
@@ -526,6 +527,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/trade_history", get(get_trade_history))
         .route("/session", get(get_latest_session))
         .route("/session_stream", get(websocket_handler))
+        .fallback_service(get_service(ServeDir::new("web-ui/dist")))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
 
