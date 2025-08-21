@@ -22,7 +22,7 @@ impl Task for RegimenReportingTask {
         std::any::type_name::<Self>()
     }
 
-    async fn run(&self, context: Context) -> graph_flow::Result<TaskResult> {
+    async fn run(&self, _context: Context) -> graph_flow::Result<TaskResult> {
         info!("Starting regimen reporting task");
 
         // TODO: Implement regimen reporting logic

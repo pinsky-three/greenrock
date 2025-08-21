@@ -22,7 +22,7 @@ impl Task for PortfolioSelectionTask {
         std::any::type_name::<Self>()
     }
 
-    async fn run(&self, context: Context) -> graph_flow::Result<TaskResult> {
+    async fn run(&self, _context: Context) -> graph_flow::Result<TaskResult> {
         info!("Starting portfolio selection task");
 
         // TODO: Implement portfolio selection logic

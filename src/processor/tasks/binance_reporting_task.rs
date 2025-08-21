@@ -22,7 +22,7 @@ impl Task for BinanceReportingTask {
         std::any::type_name::<Self>()
     }
 
-    async fn run(&self, context: Context) -> graph_flow::Result<TaskResult> {
+    async fn run(&self, _context: Context) -> graph_flow::Result<TaskResult> {
         info!("Starting Binance operations task");
 
         // TODO: Implement Binance operations logic
