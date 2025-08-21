@@ -15,6 +15,7 @@ use graph_flow::{
 
 use greenrock::{
     brokers::binance::BinanceBroker,
+    models::timeseries::Candle,
     processor::tasks::{
         binance_operations_task::BinanceOperationsTask,
         binance_reporting_task::BinanceReportingTask, entry_interaction_task::EntryInteractionTask,
@@ -189,11 +190,21 @@ async fn get_trade_history(State(state): State<AppState>, symbol: Query<String>)
     }
 }
 
+// #[derive(Clone)]
+struct GreenrockSession {
+    id: Uuid,
+    symbol: String,
+    interval: String,
+    candles: Vec<Candle>,
+    balance: HashMap<String, f64>,
+}
+
 #[derive(Clone)]
 struct AppState {
     flow_runner: Arc<FlowRunner>,
     session_storage: Arc<dyn SessionStorage>,
     live_loop_runner: Arc<Runner<HashMap<String, f64>, BinanceBroker>>,
+    greenrock_session: Arc<GreenrockSession>,
 }
 
 async fn setup_graph(
@@ -359,7 +370,13 @@ async fn get_latest_session(State(state): State<AppState>) -> Response {
     // Get candles asynchronously
     let candles_result = state
         .live_loop_runner
-        .candles("BTCUSDT", "1m", 100, None, None)
+        .candles(
+            &state.greenrock_session.symbol.clone(),
+            &state.greenrock_session.interval.clone(),
+            500,
+            None,
+            None,
+        )
         .await;
 
     // Get balance in blocking task
@@ -386,7 +403,13 @@ async fn websocket_handler(State(state): State<AppState>, ws: WebSocketUpgrade) 
 
 async fn handle_socket(mut socket: WebSocket, state: AppState) {
     info!("WebSocket client connected");
-    let mut stream = state.live_loop_runner.candles_stream("BTCUSDT", "1m").await;
+    let mut stream = state
+        .live_loop_runner
+        .candles_stream(
+            &state.greenrock_session.symbol.clone(),
+            &state.greenrock_session.interval.clone(),
+        )
+        .await;
 
     loop {
         tokio::select! {
@@ -482,6 +505,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         flow_runner,
         session_storage,
         live_loop_runner: runner.clone(),
+        greenrock_session: Arc::new(GreenrockSession {
+            id: Uuid::new_v4(),
+            symbol: "BTCUSDT".to_string(),
+            interval: "1m".to_string(),
+            candles: vec![],
+            balance: HashMap::new(),
+        }),
     };
 
     let cors = CorsLayer::new()
