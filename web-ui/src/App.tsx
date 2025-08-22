@@ -423,16 +423,16 @@ export default function App() {
     <ErrorBoundary>
       <div className="h-screen w-screen bg-neutral-950 text-white flex flex-col">
         {/* TradingView Style Header */}
-        <header className="bg-neutral-950 h-12 border-b border-gray-800 flex items-center px-3">
+        <header className="bg-neutral-950 h-12 border-b border-neutral-800 flex items-center px-3">
           {/* Left: Logo + Symbol Search */}
           <div className="flex items-center space-x-3">
             {/* Logo placeholder */}
-            <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center text-white font-bold text-sm">
+            <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center text-black font-bold ">
               G
             </div>
 
             {/* Symbol Search */}
-            <div className="flex items-center bg-neutral-950 rounded border-0 hover:border-gray-600 px-3 py-1.5">
+            <div className="flex items-center bg-neutral-950 rounded border-0 hover:border-neutral-600 px-3 py-1.5">
               <IoSearch className="text-neutral-400 mr-2" size={16} />
               <span className="text-white font-medium">{symbol}</span>
               {/* <span className="text-yellow-400 ml-2 text-xs font-medium">
@@ -467,7 +467,7 @@ export default function App() {
           </div>
 
           {/* Center: Timeframe + Chart Tools */}
-          <div className="flex-1 flex justify-center items-center space-x-4">
+          <div className="flex-1 flex justify-center items-center space-x-4 h-full py-1">
             {/* Timeframe Selector */}
             <div className="flex items-center space-x-1 h-full">
               {["1m", "5m", "15m", "1h", "4h", "1d"].map((tf) => (
@@ -492,7 +492,7 @@ export default function App() {
             </div>
 
             {/* Chart Type Tools */}
-            <div className="flex items-center space-x-1 border-l border-gray-700 pl-4">
+            <div className="flex items-center space-x-1 border-l border-neutral-700 pl-4">
               <button
                 className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
                 title="Candles"
@@ -514,7 +514,7 @@ export default function App() {
             </div>
 
             {/* Indicators */}
-            <div className="flex items-center space-x-1 border-l border-gray-700 pl-4">
+            <div className="flex items-center space-x-1 border-l border-neutral-700 pl-4">
               <button className="px-2 py-1 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800 rounded">
                 <IoTrendingUp className="inline mr-1" size={14} />
                 Indicators
@@ -633,10 +633,10 @@ export default function App() {
         <div className="flex-1 flex relative">
           {/* Collapsible Left Sidebar */}
           {!showChat && !showTrading && !leftSidebarCollapsed && (
-            <aside className="w-64 bg-neutral-950 border-r border-gray-800 flex flex-col">
+            <aside className="w-64 bg-neutral-950 border-r border-neutral-800 flex flex-col">
               {/* Tab Headers */}
-              <div className="flex border-b border-gray-800">
-                <button className="flex-1 px-3 py-2 text-xs bg-neutral-800 text-white border-r border-gray-700">
+              <div className="flex border-b border-neutral-800">
+                <button className="flex-1 px-3 py-2 text-xs bg-neutral-800 text-white border-r border-neutral-700">
                   Portfolio
                 </button>
                 <button className="flex-1 px-3 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800">
@@ -775,13 +775,13 @@ export default function App() {
 
           {/* Collapsible Right Sidebar */}
           {!showChat && !showTrading && !rightSidebarCollapsed && (
-            <aside className="w-72 bg-neutral-950 border-l border-gray-800 flex flex-col">
+            <aside className="w-72 bg-neutral-950 border-l border-neutral-800 flex flex-col">
               {/* Tab Headers */}
-              <div className="flex border-b border-gray-800">
-                <button className="flex-1 px-3 py-2 text-xs bg-neutral-800 text-white border-r border-gray-700">
+              <div className="flex border-b border-neutral-800">
+                <button className="flex-1 px-3 py-2 text-xs bg-neutral-800 text-white border-r border-neutral-700">
                   Order Book
                 </button>
-                <button className="flex-1 px-3 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800 border-r border-gray-700">
+                <button className="flex-1 px-3 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800 border-r border-neutral-700">
                   Trades
                 </button>
                 <button className="flex-1 px-3 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800">
@@ -911,7 +911,7 @@ export default function App() {
                       </div>
 
                       {/* Status */}
-                      <div className="pt-3 border-t border-gray-700 text-xs text-neutral-400 text-center">
+                      <div className="pt-3 border-t border-neutral-700 text-xs text-neutral-400 text-center">
                         {isOrderBookStreamConnected ? (
                           <span className="text-emerald-400">
                             🟢 Live Updates
@@ -933,7 +933,7 @@ export default function App() {
         </div>
 
         {/* Bottom Toolbar like TradingView */}
-        <footer className="bg-neutral-950 h-10 border-t border-gray-800 flex items-center px-4">
+        <footer className="bg-neutral-950 h-10 border-t border-neutral-800 flex items-center px-4">
           {/* Left: Status and Stats */}
           <div className="flex items-center space-x-6 text-xs">
             <div className="flex items-center space-x-2">
