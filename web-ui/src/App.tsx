@@ -1,9 +1,8 @@
-import type { Time, ISeriesApi } from "lightweight-charts";
-import { useEffect, useRef, useState, useCallback } from "react";
+import type { ISeriesApi } from "lightweight-charts";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type {
   ApiCandle,
   Balance,
-  Candle,
   OrderBook,
   // Portfolio,
   TimeRange,
@@ -65,9 +64,9 @@ export default function App() {
   // Time range state
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
     const presets = getTimeRangePresets();
-    return { start: presets["4h"].start, end: presets["4h"].end };
+    return { start: presets["1d"].start, end: presets["1d"].end };
   });
-  const [timeRangePreset, setTimeRangePreset] = useState<string>("4h");
+  const [timeRangePreset, setTimeRangePreset] = useState<string>("1d");
 
   // WebSocket refs
   const candleWsRef = useRef<WebSocket | null>(null);
@@ -152,18 +151,8 @@ export default function App() {
             return newCandles;
           });
 
-          // Convert API candle to chart format and update chart
-          const chartCandle: Candle = {
-            time: Math.floor(apiCandle.timestamp / 1000) as Time,
-            open: apiCandle.open,
-            high: apiCandle.high,
-            low: apiCandle.low,
-            close: apiCandle.close,
-          };
-
-          if (candlestickSeries) {
-            candlestickSeries.update(chartCandle);
-          }
+          // Real-time updates will be handled through state changes
+          // The Chart component will receive the updated candleData prop
         } catch (err) {
           console.error("Failed to parse candle WebSocket message:", err);
         }
@@ -393,14 +382,30 @@ export default function App() {
   // }, []);
 
   // Convert API candles to chart format and apply time filter
-  const chartData =
-    candles.length > 0
-      ? filterCandlesByTimeRange(
-          convertApiCandlesToChart(candles),
-          selectedTimeRange.start,
-          selectedTimeRange.end
-        )
-      : undefined;
+  const chartData = useMemo(() => {
+    if (candles.length === 0) return undefined;
+
+    const convertedCandles = convertApiCandlesToChart(candles);
+    const filteredCandles = filterCandlesByTimeRange(
+      convertedCandles,
+      selectedTimeRange.start,
+      selectedTimeRange.end
+    );
+
+    console.log(
+      `Data filtering: ${candles.length} raw candles → ${convertedCandles.length} converted → ${filteredCandles.length} after time filter (${timeRangePreset})`
+    );
+    console.log(
+      `Time range: ${selectedTimeRange.start.toISOString()} to ${selectedTimeRange.end.toISOString()}`
+    );
+
+    return filteredCandles;
+  }, [
+    candles,
+    selectedTimeRange.start,
+    selectedTimeRange.end,
+    timeRangePreset,
+  ]);
 
   // Calculate portfolio value from balance
   const calculatePortfolioValue = (balance: Balance): number => {
@@ -470,18 +475,12 @@ export default function App() {
           <div className="flex-1 flex justify-center items-center space-x-4 h-full py-1">
             {/* Timeframe Selector */}
             <div className="flex items-center space-x-1 h-full">
-              {["1m", "5m", "15m", "1h", "4h", "1d"].map((tf) => (
+              {["1h", "4h", "1d", "All"].map((tf) => (
                 <button
                   key={tf}
-                  onClick={() =>
-                    handleTimeRangeChange(
-                      tf === "1m" ? "1h" : tf === "5m" ? "4h" : "1d"
-                    )
-                  }
+                  onClick={() => handleTimeRangeChange(tf.toLowerCase())}
                   className={`px-2 h-full text-xs rounded ${
-                    (tf === "1m" && timeRangePreset === "1h") ||
-                    (tf === "5m" && timeRangePreset === "4h") ||
-                    (tf === "1d" && timeRangePreset === "1d")
+                    timeRangePreset === tf.toLowerCase()
                       ? "bg-neutral-800 text-white"
                       : "text-neutral-400 hover:text-white hover:bg-neutral-800"
                   }`}

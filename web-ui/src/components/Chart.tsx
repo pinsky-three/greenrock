@@ -27,6 +27,7 @@ export const ChartComponent = (props: {
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const isInitialLoadRef = useRef(true);
+  const previousDataLengthRef = useRef(0);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -58,6 +59,11 @@ export const ChartComponent = (props: {
         timeScale: {
           borderColor: "#333333",
           timeVisible: true,
+          barSpacing: 15,
+          minBarSpacing: 10,
+          rightOffset: 10,
+          fixLeftEdge: false,
+          fixRightEdge: false,
         },
         rightPriceScale: {
           borderColor: "#333333",
@@ -82,8 +88,11 @@ export const ChartComponent = (props: {
         onSeriesReady(series);
       }
 
-      chart.timeScale().fitContent();
-      chart.timeScale().scrollToPosition(5, true);
+      // Initial setup with better spacing
+      chart.timeScale().applyOptions({
+        barSpacing: 15,
+        rightOffset: 10,
+      });
     }
 
     window.addEventListener("resize", handleResize);
@@ -96,12 +105,48 @@ export const ChartComponent = (props: {
   // Separate effect for updating data
   useEffect(() => {
     if (seriesRef.current && candleData && candleData.length > 0) {
-      seriesRef.current.setData(candleData);
+      const currentDataLength = candleData.length;
+      const previousDataLength = previousDataLengthRef.current;
 
-      // Only auto-fit content on initial load or when explicitly enabled and it's the first load
-      if (autoFitContent && chartRef.current && isInitialLoadRef.current) {
-        chartRef.current.timeScale().fitContent();
+      if (isInitialLoadRef.current) {
+        // Initial load - always use setData for all historical data
+        console.log("Initial load: setting", currentDataLength, "candles");
+        seriesRef.current.setData(candleData);
+        previousDataLengthRef.current = currentDataLength;
         isInitialLoadRef.current = false;
+
+        // Auto-fit content on initial load with proper spacing
+        if (autoFitContent && chartRef.current) {
+          chartRef.current.timeScale().fitContent();
+          // Apply better spacing after fitting
+          setTimeout(() => {
+            if (chartRef.current) {
+              chartRef.current.timeScale().applyOptions({
+                barSpacing: 15,
+                rightOffset: 10,
+              });
+            }
+          }, 100);
+        }
+      } else if (currentDataLength > previousDataLength) {
+        // New data added - use update for the latest candle
+        console.log("New candle added, updating latest");
+        const latestCandle = candleData[candleData.length - 1];
+        seriesRef.current.update(latestCandle);
+        previousDataLengthRef.current = currentDataLength;
+      } else if (
+        currentDataLength === previousDataLength &&
+        previousDataLength > 0
+      ) {
+        // Same length, but data might have changed (e.g., last candle updated)
+        console.log("Updating existing candle");
+        const latestCandle = candleData[candleData.length - 1];
+        seriesRef.current.update(latestCandle);
+      } else {
+        // Data length changed significantly - full reset needed
+        console.log("Full reset: setting", currentDataLength, "candles");
+        seriesRef.current.setData(candleData);
+        previousDataLengthRef.current = currentDataLength;
       }
     }
   }, [candleData, autoFitContent]);

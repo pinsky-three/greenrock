@@ -18,13 +18,27 @@ import type {
 
 // Convert API candles to chart format
 export const convertApiCandlesToChart = (apiCandles: ApiCandle[]): Candle[] => {
-  return apiCandles.map((candle) => ({
+  console.log("Converting candles:", apiCandles.length, "samples:");
+  if (apiCandles.length > 0) {
+    console.log("First candle:", apiCandles[0]);
+    console.log("Last candle:", apiCandles[apiCandles.length - 1]);
+  }
+
+  const converted = apiCandles.map((candle) => ({
     time: Math.floor(candle.timestamp / 1000) as Time,
     open: candle.open,
     high: candle.high,
     low: candle.low,
     close: candle.close,
   }));
+
+  console.log(
+    "Converted result:",
+    converted.length,
+    "first converted:",
+    converted[0]
+  );
+  return converted;
 };
 
 // Filter candles by time range
@@ -36,7 +50,19 @@ export const filterCandlesByTimeRange = (
   const startTimestamp = Math.floor(startTime.getTime() / 1000);
   const endTimestamp = Math.floor(endTime.getTime() / 1000);
 
-  return candles.filter((candle) => {
+  console.log(
+    `Filtering ${candles.length} candles between ${startTimestamp} and ${endTimestamp}`
+  );
+  if (candles.length > 0) {
+    console.log(
+      "First candle time:",
+      candles[0].time,
+      "Last candle time:",
+      candles[candles.length - 1].time
+    );
+  }
+
+  const filtered = candles.filter((candle) => {
     let candleTime: number;
     if (typeof candle.time === "number") {
       candleTime = candle.time;
@@ -46,8 +72,13 @@ export const filterCandlesByTimeRange = (
       // Handle BusinessDay or other Time types
       candleTime = 0; // Skip invalid entries
     }
-    return candleTime >= startTimestamp && candleTime <= endTimestamp;
+    const isInRange =
+      candleTime >= startTimestamp && candleTime <= endTimestamp;
+    return isInRange;
   });
+
+  console.log(`Filtered result: ${filtered.length} candles remain`);
+  return filtered;
 };
 
 // Get predefined time ranges

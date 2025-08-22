@@ -113,13 +113,13 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
   }, []);
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white">
+    <div className="flex flex-col h-full bg-neutral-900 text-white">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         <div className="flex items-center space-x-3">
-          <h2 className="text-lg font-medium">AI Chat Assistant</h2>
+          <h2 className="text-lg font-medium">Greenrock Agent</h2>
           {currentSessionId && (
-            <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded">
+            <span className="text-xs text-neutral-400 bg-neutral-800 px-2 py-1 rounded">
               Session: {currentSessionId.slice(0, 8)}...
             </span>
           )}
@@ -127,13 +127,13 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
         <div className="flex items-center space-x-2">
           <button
             onClick={clearChat}
-            className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded"
+            className="text-xs bg-neutral-700 hover:bg-neutral-600 px-2 py-1 rounded"
           >
             Clear
           </button>
           <button
             onClick={onClose}
-            className="text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded"
+            className="text-xs bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded"
           >
             Close
           </button>
@@ -143,7 +143,7 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 mt-8">
+          <div className="text-center text-neutral-500 mt-8">
             <div className="text-2xl mb-2">🤖</div>
             <p>Start a conversation with the AI assistant</p>
             <p className="text-sm mt-1">
@@ -164,10 +164,10 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
                   message.role === "user"
                     ? "bg-blue-600 text-white"
                     : message.status === "error"
-                    ? "bg-red-600 text-white"
+                    ? "bg-rose-600 text-white"
                     : message.status === "paused"
                     ? "bg-yellow-600 text-white"
-                    : "bg-gray-700 text-white"
+                    : "bg-neutral-700 text-white"
                 }`}
               >
                 <div className="text-sm whitespace-pre-wrap">
@@ -185,16 +185,16 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
         )}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-700 text-white px-4 py-2 rounded-lg">
+            <div className="bg-neutral-700 text-white px-4 py-2 rounded-lg">
               <div className="flex items-center space-x-2">
                 <div className="animate-pulse flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce"></div>
                   <div
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce"
                     style={{ animationDelay: "0.1s" }}
                   ></div>
                   <div
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce"
                     style={{ animationDelay: "0.2s" }}
                   ></div>
                 </div>
@@ -214,19 +214,19 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask about trading strategies, market analysis, or portfolio management..."
-            className="flex-1 bg-gray-800 text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none resize-none"
+            className="flex-1 bg-neutral-800 text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none resize-none"
             rows={2}
             disabled={isLoading}
           />
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded-lg font-medium"
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-600 px-4 py-2 rounded-lg font-medium"
           >
             Send
           </button>
         </div>
-        <div className="text-xs text-gray-500 mt-2">
+        <div className="text-xs text-neutral-500 mt-2">
           Press Enter to send, Shift+Enter for new line
         </div>
       </div>
