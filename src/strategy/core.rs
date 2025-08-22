@@ -71,7 +71,9 @@ pub trait Strategy: Send + Sync {
         tick: Candle,
     ) -> StrategyAction;
 
-    fn default_state(&self) -> Self::State;
+    fn initial_state(&self) -> Self::State;
+
+    fn portfolio(&self) -> HashMap<String, f64>;
 }
 
 #[derive(Clone)]
@@ -221,7 +223,18 @@ impl Strategy for MinimalStrategy {
         (ctx.clone(), state.clone())
     }
 
-    fn default_state(&self) -> Self::State {
+    fn initial_state(&self) -> Self::State {
         Self::State::default()
+    }
+
+    // hashmap of symbol and priority, priority is a number between 0 and 1
+    fn portfolio(&self) -> HashMap<String, f64> {
+        let mut portfolio = HashMap::new();
+
+        portfolio.insert("BTCUSDT".to_string(), 0.5);
+        portfolio.insert("ETHUSDT".to_string(), 0.3);
+        portfolio.insert("SOLUSDT".to_string(), 0.2);
+
+        portfolio
     }
 }

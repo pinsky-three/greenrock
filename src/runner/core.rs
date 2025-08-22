@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use binance::model::{Order, TradeHistory};
+use binance::model::{Order, OrderBook, TradeHistory};
 use chrono::{DateTime, Duration, Utc};
 use polars::frame::DataFrame;
 // use ta::{DataItem, Next, indicators::MovingAverageConvergenceDivergence};
@@ -15,13 +15,14 @@ use crate::{
     strategy::core::{Strategy, StrategyAction, StrategyContext},
 };
 
-pub struct Runner<State, B>
+pub struct Runner<State, B, S>
 where
     B: Broker + Send + Sync,
+    S: Strategy<State = State> + Send + Sync,
     State: Clone,
 {
     broker: B,
-    strategy: Box<dyn Strategy<State = State>>,
+    strategy: S,
 }
 
 pub struct RunConfig {
@@ -32,12 +33,13 @@ pub struct RunConfig {
     // pub end_time: Option<DateTime<Utc>>,
 }
 
-impl<State, B> Runner<State, B>
+impl<State, B, S> Runner<State, B, S>
 where
     State: Clone + Default,
     B: Broker + Send + Sync,
+    S: Strategy<State = State> + Send + Sync,
 {
-    pub fn new(broker: B, strategy: Box<dyn Strategy<State = State>>) -> Self {
+    pub fn new(broker: B, strategy: S) -> Self {
         Self { broker, strategy }
     }
 
@@ -51,6 +53,18 @@ where
 
     pub fn balance(&self) -> HashMap<String, f64> {
         self.broker.balance()
+    }
+
+    pub fn portfolio(&self) -> HashMap<String, f64> {
+        self.strategy.portfolio()
+    }
+
+    pub fn order_book(&self, symbol: &str, depth: u64) -> OrderBook {
+        self.broker.order_book(symbol, depth)
+    }
+
+    pub fn order_book_stream(&self, symbol: &str) -> tokio::sync::broadcast::Receiver<OrderBook> {
+        self.broker.order_book_stream(symbol)
     }
 
     pub fn market_current_price(&self, symbol: &str) -> f64 {

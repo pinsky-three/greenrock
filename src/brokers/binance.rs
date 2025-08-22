@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 
-use binance::model::{KlineSummaries, Order, TradeHistory};
+use binance::model::{KlineSummaries, Order, OrderBook, TradeHistory};
 use binance::{account::Account, api::Binance, market::Market};
 use chrono::{DateTime, Utc};
 use tracing::{error, info};
@@ -212,6 +212,74 @@ impl Broker for BinanceBroker {
             }
         }
     }
+
+    fn order_book(&self, symbol: &str, depth: u64) -> OrderBook {
+        let market: Market = Binance::new(None, None);
+        match market.get_custom_depth(symbol, depth) {
+            Ok(book) => book,
+            Err(e) => {
+                error!("Failed to get order book: {}", e);
+                OrderBook {
+                    last_update_id: 0,
+                    bids: vec![],
+                    asks: vec![],
+                }
+            }
+        }
+    }
+
+    fn order_book_stream(&self, symbol: &str) -> broadcast::Receiver<OrderBook> {
+        let (tx, rx) = broadcast::channel::<OrderBook>(1024);
+        let symbol = symbol.to_lowercase();
+
+        let market: Market = Binance::new(None, None);
+        let _stream = market.get_depth(symbol.clone());
+
+        tokio::spawn(async move {
+            let mut backoff = Duration::from_secs(1);
+            let max_backoff = Duration::from_secs(60);
+
+            loop {
+                let url = format!("wss://stream.binance.com:9443/ws/{symbol}@depth");
+
+                match tokio_tungstenite::connect_async(&url).await {
+                    Ok((mut ws, _resp)) => {
+                        // Reset backoff on successful connect
+                        backoff = Duration::from_secs(1);
+
+                        while let Some(msg) = ws.next().await {
+                            match msg {
+                                Ok(Message::Text(text)) => {
+                                    if let Ok(book) = parse_order_book(&text) {
+                                        let _ = tx.send(book);
+                                    }
+                                }
+                                Ok(Message::Binary(_)) => {}
+                                Ok(Message::Ping(p)) => {
+                                    let _ = ws.send(Message::Pong(p)).await;
+                                }
+                                Ok(Message::Pong(_)) => {}
+                                Ok(Message::Close(_)) => break,
+                                Ok(Message::Frame(_)) => {}
+                                Err(e) => {
+                                    eprintln!("binance ws error: {e}");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("binance connect error: {e}");
+                    }
+                }
+
+                sleep(backoff).await;
+                backoff = (backoff * 2).min(max_backoff);
+            }
+        });
+
+        rx
+    }
 }
 
 impl BinanceBroker {
@@ -234,6 +302,25 @@ struct WsEnvelope {
     data: Option<KlineData>,
     #[serde(rename = "k", default)]
     k_inline: Option<KlineInner>,
+    // Depth update fields
+    #[serde(rename = "e", default)]
+    event_type: Option<String>,
+    // #[serde(rename = "E", default)]
+    // event_time: Option<u64>,
+    // #[serde(rename = "T", default)]
+    // transaction_time: Option<u64>,
+    // #[serde(rename = "s", default)]
+    // symbol: Option<String>,
+    // #[serde(rename = "U", default)]
+    // first_update_id: Option<u64>,
+    #[serde(rename = "u", default)]
+    final_update_id: Option<u64>,
+    // #[serde(rename = "pu", default)]
+    // prev_final_update_id: Option<u64>,
+    #[serde(rename = "b", default)]
+    bids: Option<Vec<Vec<String>>>,
+    #[serde(rename = "a", default)]
+    asks: Option<Vec<Vec<String>>>,
 }
 
 #[derive(Deserialize)]
@@ -262,6 +349,55 @@ struct KlineInner {
     volume: String,
     // #[serde(rename = "x")]
     // is_final: bool,
+}
+
+fn parse_order_book(text: &str) -> Result<OrderBook, serde_json::Error> {
+    let env: WsEnvelope = serde_json::from_str(text)?;
+
+    // Check if this is a depth update event
+    if env.event_type.as_deref() == Some("depthUpdate") {
+        let bids = env
+            .bids
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|bid| {
+                if bid.len() >= 2 {
+                    Some(binance::model::Bids {
+                        price: bid[0].parse().unwrap_or(0.0),
+                        qty: bid[1].parse().unwrap_or(0.0),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let asks = env
+            .asks
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|ask| {
+                if ask.len() >= 2 {
+                    Some(binance::model::Asks {
+                        price: ask[0].parse().unwrap_or(0.0),
+                        qty: ask[1].parse().unwrap_or(0.0),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        return Ok(OrderBook {
+            last_update_id: env.final_update_id.unwrap_or(0),
+            bids,
+            asks,
+        });
+    }
+
+    // Fallback for other formats (shouldn't happen with depth stream)
+    use serde::de::Error;
+    Err(serde_json::Error::custom("Invalid depth update format"))
 }
 
 fn parse_kline(text: &str) -> Result<Candle, serde_json::Error> {

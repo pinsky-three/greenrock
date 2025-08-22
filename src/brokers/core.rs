@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use binance::model::{Order, TradeHistory};
+use binance::model::{Order, OrderBook, TradeHistory};
 use chrono::{DateTime, Utc};
 
 pub trait Broker {
@@ -21,4 +21,6 @@ pub trait Broker {
     ) -> impl std::future::Future<Output = Vec<crate::models::timeseries::Candle>> + Send;
     fn open_orders(&self, symbol: &str) -> Vec<Order>;
     fn trade_history(&self, symbol: &str) -> Vec<TradeHistory>;
+    fn order_book(&self, symbol: &str, depth: u64) -> OrderBook;
+    fn order_book_stream(&self, symbol: &str) -> tokio::sync::broadcast::Receiver<OrderBook>;
 }

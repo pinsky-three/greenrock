@@ -10,24 +10,15 @@ use axum::{
 
 use chrono::DateTime;
 use graph_flow::{
-    Context, ExecutionStatus, FlowRunner, GraphBuilder, GraphStorage, InMemoryGraphStorage,
-    PostgresSessionStorage, Session, SessionStorage, Task,
+    Context, ExecutionStatus, FlowRunner, GraphStorage, InMemoryGraphStorage,
+    PostgresSessionStorage, Session, SessionStorage,
 };
 
 use greenrock::{
+    analysis::graph::setup_graph,
     brokers::binance::BinanceBroker,
     models::timeseries::Candle,
-    processor::tasks::{
-        binance_operations_task::BinanceOperationsTask,
-        binance_reporting_task::BinanceReportingTask, entry_interaction_task::EntryInteractionTask,
-        portfolio_aggregation_task::PortfolioAggregationTask,
-        portfolio_reporting_task::PortfolioReportingTask,
-        portfolio_selection_task::PortfolioSelectionTask,
-        regimen_aggregation_task::RegimenAggregationTask,
-        regimen_evaluation_task::RegimenEvaluationTask,
-        regimen_reporting_task::RegimenReportingTask, regimen_selection_task::RegimenSelectionTask,
-        regimen_switching_task::RegimenSwitchingTask, reply_generation_task::ReplyGenerationTask,
-    },
+    processor::tasks::entry_interaction_task::EntryInteractionTask,
     runner::core::{RunConfig, Runner},
     strategy::core::{MinimalStrategy, Strategy},
 };
@@ -44,10 +35,6 @@ use uuid::Uuid;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
-
-async fn health_check() -> &'static str {
-    "OK"
-}
 
 #[derive(Debug, Deserialize)]
 struct ChatRequest {
@@ -78,8 +65,18 @@ struct CandlesQuery {
     end: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct OrderBookQuery {
+    symbol: String,
+    depth: u64,
+}
+
 fn internal_error(message: &str) -> Response {
     (StatusCode::INTERNAL_SERVER_ERROR, message.to_string()).into_response()
+}
+
+async fn health_check(State(_state): State<AppState>) -> &'static str {
+    &"OK"
 }
 
 async fn chat(State(state): State<AppState>, Json(params): Json<ChatRequest>) -> Response {
@@ -213,202 +210,12 @@ struct GreenrockSession {
 struct AppState {
     flow_runner: Arc<FlowRunner>,
     session_storage: Arc<dyn SessionStorage>,
-    live_loop_runner: Arc<Runner<HashMap<String, f64>, BinanceBroker>>,
+    live_loop_runner: Arc<Runner<HashMap<String, f64>, BinanceBroker, MinimalStrategy>>,
     greenrock_session: Arc<GreenrockSession>,
 }
 
-async fn setup_graph(
-    graph_storage: Arc<dyn GraphStorage>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    info!("Setting up greenrock workflow graph");
-
-    let entry_interaction_task: Arc<dyn Task> = Arc::new(EntryInteractionTask::new("".to_string()));
-
-    let regimen_reporting_task: Arc<dyn Task> = Arc::new(RegimenReportingTask);
-    let regimen_evaluation_task: Arc<dyn Task> = Arc::new(RegimenEvaluationTask);
-    let regimen_switching_task: Arc<dyn Task> = Arc::new(RegimenSwitchingTask);
-    let regimen_aggregation_task: Arc<dyn Task> = Arc::new(RegimenAggregationTask);
-    let regimen_selection_task: Arc<dyn Task> = Arc::new(RegimenSelectionTask);
-
-    let binance_reporting_task: Arc<dyn Task> = Arc::new(BinanceReportingTask);
-    let binance_operations_task: Arc<dyn Task> = Arc::new(BinanceOperationsTask);
-
-    let portfolio_reporting_task: Arc<dyn Task> = Arc::new(PortfolioReportingTask);
-    let portfolio_aggregation_task: Arc<dyn Task> = Arc::new(PortfolioAggregationTask);
-    let portfolio_selection_task: Arc<dyn Task> = Arc::new(PortfolioSelectionTask);
-
-    let reply_generation_task: Arc<dyn Task> = Arc::new(ReplyGenerationTask);
-
-    //
-
-    let entry_interaction_task_id = entry_interaction_task.id().to_string();
-    let reply_generation_task_id = reply_generation_task.id().to_string();
-
-    let regimen_reporting_task_id = regimen_reporting_task.id().to_string();
-    let regimen_evaluation_task_id = regimen_evaluation_task.id().to_string();
-    let regimen_switching_task_id = regimen_switching_task.id().to_string();
-    let regimen_aggregation_task_id = regimen_aggregation_task.id().to_string();
-    let regimen_selection_task_id = regimen_selection_task.id().to_string();
-
-    let binance_reporting_task_id = binance_reporting_task.id().to_string();
-    let binance_operations_task_id = binance_operations_task.id().to_string();
-
-    let portfolio_reporting_task_id = portfolio_reporting_task.id().to_string();
-    let portfolio_aggregation_task_id = portfolio_aggregation_task.id().to_string();
-    let portfolio_selection_task_id = portfolio_selection_task.id().to_string();
-
-    // Build graph
-    let graph = Arc::new(
-        GraphBuilder::new("greenrock_main_flow")
-            .add_task(entry_interaction_task)
-            //
-            .add_task(reply_generation_task)
-            //
-            .add_task(regimen_reporting_task)
-            .add_task(regimen_evaluation_task)
-            .add_task(regimen_switching_task)
-            .add_task(regimen_aggregation_task)
-            .add_task(regimen_selection_task)
-            //
-            .add_task(binance_reporting_task)
-            .add_task(binance_operations_task)
-            //
-            .add_task(portfolio_reporting_task)
-            .add_task(portfolio_aggregation_task)
-            //
-            .add_task(portfolio_selection_task)
-            //
-            .add_conditional_edge(
-                entry_interaction_task_id.clone(),
-                {
-                    let reply_generation_task_id = reply_generation_task_id.clone();
-                    let regimen_reporting_task_id = regimen_reporting_task_id.clone();
-
-                    move |ctx| {
-                        (ctx.get_sync::<String>("next_task")
-                            .unwrap_or(reply_generation_task_id.clone()))
-                            == regimen_reporting_task_id
-                    }
-                },
-                regimen_reporting_task_id.clone(),
-                reply_generation_task_id.clone(),
-            )
-            .add_conditional_edge(
-                entry_interaction_task_id.clone(),
-                {
-                    let reply_generation_task_id = reply_generation_task_id.clone();
-                    let binance_reporting_task_id = binance_reporting_task_id.clone();
-
-                    move |ctx| {
-                        (ctx.get_sync::<String>("next_task")
-                            .unwrap_or(reply_generation_task_id.clone()))
-                            == binance_reporting_task_id
-                    }
-                },
-                binance_reporting_task_id.clone(),
-                reply_generation_task_id.clone(),
-            )
-            .add_conditional_edge(
-                entry_interaction_task_id.clone(),
-                {
-                    let reply_generation_task_id = reply_generation_task_id.clone();
-                    let portfolio_reporting_task_id = portfolio_reporting_task_id.clone();
-
-                    move |ctx| {
-                        (ctx.get_sync::<String>("next_task")
-                            .unwrap_or(reply_generation_task_id.clone()))
-                            == portfolio_reporting_task_id
-                    }
-                },
-                portfolio_reporting_task_id.clone(),
-                reply_generation_task_id.clone(),
-            )
-            .add_edge(
-                regimen_reporting_task_id.clone(),
-                reply_generation_task_id.clone(),
-            )
-            .add_edge(
-                binance_reporting_task_id.clone(),
-                reply_generation_task_id.clone(),
-            )
-            .add_edge(
-                portfolio_reporting_task_id.clone(),
-                reply_generation_task_id.clone(),
-            )
-            .add_edge(
-                regimen_selection_task_id.clone(),
-                reply_generation_task_id.clone(),
-            )
-            .add_edge(
-                binance_operations_task_id.clone(),
-                regimen_selection_task_id.clone(),
-            )
-            .add_edge(
-                portfolio_selection_task_id.clone(),
-                regimen_selection_task_id.clone(),
-            )
-            .add_edge(
-                portfolio_aggregation_task_id.clone(),
-                regimen_selection_task_id.clone(),
-            )
-            .add_edge(
-                regimen_aggregation_task_id.clone(),
-                regimen_selection_task_id.clone(),
-            )
-            .add_edge(
-                regimen_switching_task_id.clone(),
-                regimen_selection_task_id.clone(),
-            )
-            .add_edge(
-                regimen_evaluation_task_id.clone(),
-                regimen_selection_task_id.clone(),
-            )
-            .add_edge(
-                regimen_reporting_task_id.clone(),
-                regimen_selection_task_id.clone(),
-            )
-            .build(),
-    );
-
-    graph_storage.save("".to_string(), graph).await?;
-
-    info!("Graph built and saved successfully");
-    Ok(())
-}
-
-// async fn get_latest_session(State(state): State<AppState>) -> Response {
-//     // Get candles asynchronously
-//     // let candles_result = state
-//     //     .live_loop_runner
-//     //     .candles(
-//     //         &state.greenrock_session.symbol.clone(),
-//     //         &state.greenrock_session.interval.clone(),
-//     //         500,
-//     //         None,
-//     //         None,
-//     //     )
-//     //     .await;
-
-//     // Get balance in blocking task
-//     let balance_result =
-//         tokio::task::spawn_blocking(move || state.live_loop_runner.balance()).await;
-
-//     match (candles_result, balance_result) {
-//         (candles, Ok(balance)) => Json(json!({
-//             "session_id": Uuid::new_v4().to_string(),
-//             // "candles": candles,
-//             "balance": balance,
-//         }))
-//         .into_response(),
-//         (_, Err(e)) => {
-//             error!("Failed to get balance: {}", e);
-//             internal_error("Failed to get balance")
-//         }
-//     }
-// }
-
 async fn get_portfolio(State(state): State<AppState>) -> Response {
-    match tokio::task::spawn_blocking(move || state.live_loop_runner.balance()).await {
+    match tokio::task::spawn_blocking(move || state.live_loop_runner.portfolio()).await {
         Ok(portfolio) => Json(portfolio).into_response(),
         Err(e) => {
             error!("Failed to get portfolio: {}", e);
@@ -445,10 +252,33 @@ async fn get_candles(
 }
 
 async fn get_candle_stream(State(state): State<AppState>, ws: WebSocketUpgrade) -> Response {
-    ws.on_upgrade(move |socket| handle_socket(socket, state))
+    ws.on_upgrade(move |socket| handle_candles_socket_stream(socket, state))
 }
 
-async fn handle_socket(mut socket: WebSocket, state: AppState) {
+async fn get_order_book_stream(State(state): State<AppState>, ws: WebSocketUpgrade) -> Response {
+    ws.on_upgrade(move |socket| handle_depth_socket_stream(socket, state))
+}
+
+async fn get_order_book(
+    State(state): State<AppState>,
+    Query(params): Query<OrderBookQuery>,
+) -> Response {
+    match tokio::task::spawn_blocking(move || {
+        state
+            .live_loop_runner
+            .order_book(&params.symbol, params.depth)
+    })
+    .await
+    {
+        Ok(order_book) => Json(order_book).into_response(),
+        Err(e) => {
+            error!("Failed to get order book: {}", e);
+            internal_error("Failed to get order book")
+        }
+    }
+}
+
+async fn handle_candles_socket_stream(mut socket: WebSocket, state: AppState) {
     info!("WebSocket client connected");
     let mut stream = state
         .live_loop_runner
@@ -516,6 +346,70 @@ async fn handle_socket(mut socket: WebSocket, state: AppState) {
     }
 }
 
+async fn handle_depth_socket_stream(mut socket: WebSocket, state: AppState) {
+    info!("Depth WebSocket client connected");
+    let mut stream = state
+        .live_loop_runner
+        .order_book_stream(&state.greenrock_session.symbol.clone());
+
+    loop {
+        tokio::select! {
+            // Handle incoming order book data
+            recv_result = stream.recv() => {
+                match recv_result {
+                    Ok(order_book) => {
+                        match serde_json::to_string(&order_book) {
+                            Ok(msg) => {
+                                if socket.send(axum::extract::ws::Message::Text(msg.into())).await.is_err() {
+                                    info!("Depth WebSocket client disconnected");
+                                    return;
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to serialize order book: {}", e);
+                                continue;
+                            }
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(count)) => {
+                        info!("Depth WebSocket lagged by {} messages, continuing", count);
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        info!("Depth stream closed");
+                        return;
+                    }
+                }
+            }
+            // Handle incoming WebSocket messages (for ping/pong, close, etc.)
+            msg_result = socket.recv() => {
+                match msg_result {
+                    Some(Ok(axum::extract::ws::Message::Close(_))) => {
+                        info!("Depth WebSocket client sent close message");
+                        return;
+                    }
+                    Some(Ok(axum::extract::ws::Message::Ping(data))) => {
+                        if socket.send(axum::extract::ws::Message::Pong(data)).await.is_err() {
+                            return;
+                        }
+                    }
+                    Some(Err(_)) => {
+                        info!("Depth WebSocket client connection error");
+                        return;
+                    }
+                    None => {
+                        info!("Depth WebSocket client disconnected");
+                        return;
+                    }
+                    _ => {
+                        // Ignore other message types
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
@@ -541,8 +435,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let flow_runner = Arc::new(FlowRunner::new(graph.clone(), session_storage.clone()));
 
-    let strategy = Box::new(MinimalStrategy::new(DataFrame::new(vec![]).unwrap()));
-    let initial_state = strategy.default_state();
+    let strategy = MinimalStrategy::new(DataFrame::new(vec![]).unwrap());
+    let initial_state = strategy.initial_state();
 
     let binance_broker = BinanceBroker::default();
 
@@ -568,12 +462,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app: Router = Router::new()
         .route("/health", get(health_check))
         .route("/chat", post(chat))
-        .route("/balance", get(get_balance))
-        .route("/open_orders", get(get_open_orders))
-        .route("/trade_history", get(get_trade_history))
-        .route("/get_portfolio", get(get_portfolio))
-        .route("/get_candles", get(get_candles))
-        .route("/session_stream", get(get_candle_stream))
+        //
+        .route("/strategy/portfolio", get(get_portfolio))
+        //
+        .route("/broker/balance", get(get_balance))
+        .route("/broker/open_orders", get(get_open_orders))
+        .route("/broker/trade_history", get(get_trade_history))
+        .route("/broker/candles", get(get_candles))
+        .route("/broker/candle_stream", get(get_candle_stream))
+        .route("/broker/order_book", get(get_order_book))
+        .route("/broker/order_book_stream", get(get_order_book_stream))
         .fallback_service(get_service(ServeDir::new("web-ui/dist")))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
