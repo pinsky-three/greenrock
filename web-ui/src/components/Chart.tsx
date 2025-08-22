@@ -26,6 +26,7 @@ export const ChartComponent = (props: {
 
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const isInitialLoadRef = useRef(true);
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -97,9 +98,10 @@ export const ChartComponent = (props: {
     if (seriesRef.current && candleData && candleData.length > 0) {
       seriesRef.current.setData(candleData);
 
-      // Auto-fit content when data changes if enabled
-      if (autoFitContent && chartRef.current) {
+      // Only auto-fit content on initial load or when explicitly enabled and it's the first load
+      if (autoFitContent && chartRef.current && isInitialLoadRef.current) {
         chartRef.current.timeScale().fitContent();
+        isInitialLoadRef.current = false;
       }
     }
   }, [candleData, autoFitContent]);
