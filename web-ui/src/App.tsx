@@ -4,26 +4,63 @@ import type {
   ApiCandle,
   Balance,
   Candle,
-  LatestSessionResponse,
+  OrderBook,
+  // Portfolio,
   TimeRange,
 } from "./types/core";
 import { ChartComponent } from "./components/Chart";
+import { ChatComponent } from "./components/Chat";
+import { TradingControls } from "./components/TradingControls";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+// Import react-icons
+import {
+  IoSearch,
+  IoEllipsisVertical,
+  IoTrendingUp,
+  IoNotifications,
+  IoSettings,
+  IoRefresh,
+  IoChatbubble,
+  IoBarChart,
+  IoWallet,
+} from "react-icons/io5";
+import { RiFullscreenLine, RiBarChartLine } from "react-icons/ri";
+import { TbChartCandle, TbChartLine, TbChartArea } from "react-icons/tb";
 import {
   convertApiCandlesToChart,
-  fetchLatestSession,
+  createCandleStreamWebSocket,
+  createOrderBookStreamWebSocket,
+  fetchBalance,
+  fetchCandles,
+  fetchOrderBook,
+  // fetchPortfolio,
   filterCandlesByTimeRange,
   getTimeRangePresets,
 } from "./utils/core";
 
 export default function App() {
-  const [sessionData, setSessionData] = useState<LatestSessionResponse | null>(
-    null
-  );
+  // New state for the updated API
+  const [balance, setBalance] = useState<Balance | null>(null);
+  // const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [orderBook, setOrderBook] = useState<OrderBook | null>(null);
+  const [candles, setCandles] = useState<ApiCandle[]>([]);
+
+  // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isCandleStreamConnected, setIsCandleStreamConnected] = useState(false);
+  const [isOrderBookStreamConnected, setIsOrderBookStreamConnected] =
+    useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [showTrading, setShowTrading] = useState(false);
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
   const [candlestickSeries, setCandlestickSeries] =
     useState<ISeriesApi<"Candlestick"> | null>(null);
+
+  // Trading configuration
+  const [symbol] = useState("BTCUSDT");
+  const [interval] = useState("1m");
 
   // Time range state
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
@@ -32,48 +69,65 @@ export default function App() {
   });
   const [timeRangePreset, setTimeRangePreset] = useState<string>("4h");
 
-  const wsRef = useRef<WebSocket | null>(null);
+  // WebSocket refs
+  const candleWsRef = useRef<WebSocket | null>(null);
+  const orderBookWsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
 
-  // Load data function
-  const loadData = async () => {
+  // Legacy state for backward compatibility (kept for potential future use)
+  // const [sessionData, setSessionData] = useState<LatestSessionResponse | null>(
+  //   null
+  // );
+
+  // Load data function using new API endpoints
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchLatestSession();
-      setSessionData(data);
+
+      // Fetch data from new endpoints in parallel
+      const [balanceData, candlesData, orderBookData] = await Promise.all([
+        fetchBalance(),
+        // fetchPortfolio(),
+        fetchCandles({ symbol, interval }),
+        fetchOrderBook({ symbol, depth: 10 }),
+      ]);
+
+      setBalance(balanceData);
+      // setPortfolio(portfolioData);
+      setCandles(candlesData.candles);
+      setOrderBook(orderBookData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
-      console.error("Failed to fetch session data:", err);
+      console.error("Failed to fetch data:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [symbol, interval]);
 
-  // WebSocket connection management
-  const connectWebSocket = useCallback(() => {
+  // Candle stream WebSocket connection management
+  const connectCandleStream = useCallback(() => {
     if (
-      wsRef.current?.readyState === WebSocket.OPEN ||
-      wsRef.current?.readyState === WebSocket.CONNECTING
+      candleWsRef.current?.readyState === WebSocket.OPEN ||
+      candleWsRef.current?.readyState === WebSocket.CONNECTING
     ) {
       return; // Already connected or connecting
     }
 
     // Clean up any existing connection
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+    if (candleWsRef.current) {
+      candleWsRef.current.close();
+      candleWsRef.current = null;
     }
 
     try {
-      const ws = new WebSocket("ws://localhost:4200/session_stream");
-      wsRef.current = ws;
+      const ws = createCandleStreamWebSocket();
+      candleWsRef.current = ws;
 
       ws.onopen = () => {
-        console.log("WebSocket connected");
+        console.log("Candle stream WebSocket connected");
         if (isMountedRef.current) {
-          setIsConnected(true);
-          setError(null);
+          setIsCandleStreamConnected(true);
         }
       };
 
@@ -82,7 +136,23 @@ export default function App() {
           const apiCandle: ApiCandle = JSON.parse(event.data);
           console.log("Received candle:", apiCandle);
 
-          // Convert API candle to chart format
+          // Update candles state
+          setCandles((prev) => {
+            const newCandles = [...prev];
+            // Replace the last candle if it has the same timestamp, otherwise add new one
+            const lastIndex = newCandles.length - 1;
+            if (
+              lastIndex >= 0 &&
+              newCandles[lastIndex].timestamp === apiCandle.timestamp
+            ) {
+              newCandles[lastIndex] = apiCandle;
+            } else {
+              newCandles.push(apiCandle);
+            }
+            return newCandles;
+          });
+
+          // Convert API candle to chart format and update chart
           const chartCandle: Candle = {
             time: Math.floor(apiCandle.timestamp / 1000) as Time,
             open: apiCandle.open,
@@ -91,60 +161,172 @@ export default function App() {
             close: apiCandle.close,
           };
 
-          // Update the chart with new candle data
           if (candlestickSeries) {
             candlestickSeries.update(chartCandle);
           }
         } catch (err) {
-          console.error("Failed to parse WebSocket message:", err);
+          console.error("Failed to parse candle WebSocket message:", err);
         }
       };
 
       ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        if (isMountedRef.current) {
-          setError("WebSocket connection error");
-        }
+        console.error("Candle stream WebSocket error:", error);
       };
 
       ws.onclose = (event) => {
-        console.log("WebSocket disconnected:", event.code, event.reason);
+        console.log(
+          "Candle stream WebSocket disconnected:",
+          event.code,
+          event.reason
+        );
 
         if (isMountedRef.current) {
-          setIsConnected(false);
+          setIsCandleStreamConnected(false);
         }
 
         // Clear the reference if this was the current connection
-        if (wsRef.current === ws) {
-          wsRef.current = null;
+        if (candleWsRef.current === ws) {
+          candleWsRef.current = null;
         }
 
-        // Only attempt to reconnect if it wasn't a manual disconnection and component is still mounted
+        // Auto-reconnect if not a manual disconnection
         if (
           event.code !== 1000 &&
           event.code !== 1001 &&
           isMountedRef.current
         ) {
           setTimeout(() => {
-            // Double-check we still need to reconnect
-            if (!wsRef.current && candlestickSeries && isMountedRef.current) {
-              connectWebSocket();
+            if (
+              !candleWsRef.current &&
+              candlestickSeries &&
+              isMountedRef.current
+            ) {
+              connectCandleStream();
             }
           }, 3000);
         }
       };
     } catch (err) {
-      console.error("Failed to create WebSocket connection:", err);
-      setError("Failed to establish WebSocket connection");
+      console.error(
+        "Failed to create candle stream WebSocket connection:",
+        err
+      );
     }
   }, [candlestickSeries]);
 
-  // Disconnect WebSocket
-  const disconnectWebSocket = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.close(1000, "Manual disconnect");
-      wsRef.current = null;
-      setIsConnected(false);
+  // Order book stream WebSocket connection management
+  const connectOrderBookStream = useCallback(() => {
+    if (
+      orderBookWsRef.current?.readyState === WebSocket.OPEN ||
+      orderBookWsRef.current?.readyState === WebSocket.CONNECTING
+    ) {
+      return; // Already connected or connecting
+    }
+
+    // Clean up any existing connection
+    if (orderBookWsRef.current) {
+      orderBookWsRef.current.close();
+      orderBookWsRef.current = null;
+    }
+
+    try {
+      const ws = createOrderBookStreamWebSocket();
+      orderBookWsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log("Order book stream WebSocket connected");
+        if (isMountedRef.current) {
+          setIsOrderBookStreamConnected(true);
+          setError(null); // Clear any previous connection errors
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const orderBookData: OrderBook = JSON.parse(event.data);
+          console.log("Received order book:", orderBookData);
+
+          // Validate order book data structure
+          if (orderBookData && typeof orderBookData === "object") {
+            // Ensure arrays exist and have proper structure
+            const validatedOrderBook: OrderBook = {
+              symbol: orderBookData.symbol || symbol,
+              bids: Array.isArray(orderBookData.bids) ? orderBookData.bids : [],
+              asks: Array.isArray(orderBookData.asks) ? orderBookData.asks : [],
+              timestamp: orderBookData.timestamp || Date.now(),
+            };
+            setOrderBook(validatedOrderBook);
+          }
+        } catch (err) {
+          console.error("Failed to parse order book WebSocket message:", err);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error("Order book stream WebSocket error:", error);
+        if (isMountedRef.current) {
+          // Don't set error state immediately, wait for close event
+        }
+      };
+
+      ws.onclose = (event) => {
+        console.log(
+          "Order book stream WebSocket disconnected:",
+          event.code,
+          event.reason
+        );
+
+        if (isMountedRef.current) {
+          setIsOrderBookStreamConnected(false);
+
+          // Only set error if it's not a clean close
+          if (event.code !== 1000 && event.code !== 1001) {
+            console.warn(
+              "Order book stream disconnected unexpectedly, will retry"
+            );
+          }
+        }
+
+        // Clear the reference if this was the current connection
+        if (orderBookWsRef.current === ws) {
+          orderBookWsRef.current = null;
+        }
+
+        // Auto-reconnect if not a manual disconnection and component is mounted
+        if (
+          event.code !== 1000 &&
+          event.code !== 1001 &&
+          isMountedRef.current
+        ) {
+          setTimeout(() => {
+            if (!orderBookWsRef.current && isMountedRef.current) {
+              connectOrderBookStream();
+            }
+          }, 5000); // Longer delay for order book reconnection
+        }
+      };
+    } catch (err) {
+      console.error(
+        "Failed to create order book stream WebSocket connection:",
+        err
+      );
+      if (isMountedRef.current) {
+        setError("Failed to connect to order book stream");
+      }
+    }
+  }, [symbol]);
+
+  // Disconnect WebSocket streams
+  const disconnectWebSockets = useCallback(() => {
+    if (candleWsRef.current) {
+      candleWsRef.current.close(1000, "Manual disconnect");
+      candleWsRef.current = null;
+      setIsCandleStreamConnected(false);
+    }
+    if (orderBookWsRef.current) {
+      orderBookWsRef.current.close(1000, "Manual disconnect");
+      orderBookWsRef.current = null;
+      setIsOrderBookStreamConnected(false);
     }
   }, []);
 
@@ -156,22 +338,30 @@ export default function App() {
     const interval = setInterval(loadData, 30 * 60_000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [loadData]);
 
-  // Handle WebSocket connection when chart series is ready
+  // Handle WebSocket connections when chart series is ready
   useEffect(() => {
-    if (candlestickSeries && !wsRef.current) {
-      connectWebSocket();
-    }
-  }, [candlestickSeries, connectWebSocket]);
+    // Add a small delay to ensure the backend is ready
+    const connectTimer = setTimeout(() => {
+      if (candlestickSeries && !candleWsRef.current) {
+        connectCandleStream();
+      }
+      if (!orderBookWsRef.current) {
+        connectOrderBookStream();
+      }
+    }, 1000); // 1 second delay
+
+    return () => clearTimeout(connectTimer);
+  }, [candlestickSeries, connectCandleStream, connectOrderBookStream]);
 
   // Cleanup WebSocket on component unmount
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
-      disconnectWebSocket();
+      disconnectWebSockets();
     };
-  }, [disconnectWebSocket]);
+  }, [disconnectWebSockets]);
 
   // Handle series ready callback
   const handleSeriesReady = useCallback(
@@ -197,19 +387,20 @@ export default function App() {
   }, []);
 
   // Handle custom time range
-  const handleCustomTimeRange = useCallback((start: Date, end: Date) => {
-    setSelectedTimeRange({ start, end });
-    setTimeRangePreset("custom");
-  }, []);
+  // const handleCustomTimeRange = useCallback((start: Date, end: Date) => {
+  //   setSelectedTimeRange({ start, end });
+  //   setTimeRangePreset("custom");
+  // }, []);
 
   // Convert API candles to chart format and apply time filter
-  const chartData = sessionData
-    ? filterCandlesByTimeRange(
-        convertApiCandlesToChart(sessionData.candles),
-        selectedTimeRange.start,
-        selectedTimeRange.end
-      )
-    : undefined;
+  const chartData =
+    candles.length > 0
+      ? filterCandlesByTimeRange(
+          convertApiCandlesToChart(candles),
+          selectedTimeRange.start,
+          selectedTimeRange.end
+        )
+      : undefined;
 
   // Calculate portfolio value from balance
   const calculatePortfolioValue = (balance: Balance): number => {
@@ -225,243 +416,602 @@ export default function App() {
     return usdtValue + btcValue + ethValue + solValue + adaValue + xrpValue;
   };
 
-  const portfolioValue = sessionData
-    ? calculatePortfolioValue(sessionData.balance)
-    : 0;
+  const portfolioValue = balance ? calculatePortfolioValue(balance) : 0;
+  const isConnected = isCandleStreamConnected && isOrderBookStreamConnected;
 
   return (
-    <div className="h-screen w-screen bg-black text-white flex flex-col">
-      {/* Header */}
-      <header className="bg-black p-3 border-b border-gray-800 flex justify-between items-center">
-        <div className="flex items-center space-x-6">
-          <h1 className="text-xl font-medium text-gray-200">
-            Greenrock Dashboard
-          </h1>
+    <ErrorBoundary>
+      <div className="h-screen w-screen bg-black text-white flex flex-col">
+        {/* TradingView Style Header */}
+        <header className="bg-black h-12 border-b border-gray-800 flex items-center px-3">
+          {/* Left: Logo + Symbol Search */}
+          <div className="flex items-center space-x-3">
+            {/* Logo placeholder */}
+            <div className="w-8 h-8 bg-emerald-500 rounded flex items-center justify-center text-white font-bold text-sm">
+              G
+            </div>
 
-          {/* Time Range Controls */}
-          <div className="flex items-center space-x-2">
-            <span className="text-xs text-gray-500">Time Range:</span>
-            <select
-              value={timeRangePreset}
-              onChange={(e) => handleTimeRangeChange(e.target.value)}
-              className="bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-700 focus:border-blue-500 focus:outline-none"
-            >
-              {Object.entries(getTimeRangePresets()).map(([key, preset]) => (
-                <option key={key} value={key}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
+            {/* Symbol Search */}
+            <div className="flex items-center bg-gray-950 rounded border-0 hover:border-gray-600 px-3 py-1.5">
+              <IoSearch className="text-gray-400 mr-2" size={16} />
+              <span className="text-white font-medium">{symbol}</span>
+              {/* <span className="text-yellow-400 ml-2 text-xs font-medium">
+                BINANCE
+              </span> */}
+              {/* <span className="text-gray-500 mx-1">•</span>
+              <span className="text-gray-400 text-xs">1</span>
+              <span className="text-gray-500 mx-1">•</span>
+              <span className="text-gray-400 text-xs uppercase">Crypto</span> */}
+            </div>
 
-            {/* Custom date inputs for fine control */}
-            {timeRangePreset === "custom" && (
-              <div className="flex items-center space-x-2 ml-3">
-                <input
-                  type="datetime-local"
-                  value={selectedTimeRange.start.toISOString().slice(0, 16)}
-                  onChange={(e) => {
-                    const newStart = new Date(e.target.value);
-                    handleCustomTimeRange(newStart, selectedTimeRange.end);
-                  }}
-                  className="bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-700 focus:border-blue-500 focus:outline-none"
-                />
-                <span className="text-xs text-gray-500">to</span>
-                <input
-                  type="datetime-local"
-                  value={selectedTimeRange.end.toISOString().slice(0, 16)}
-                  onChange={(e) => {
-                    const newEnd = new Date(e.target.value);
-                    handleCustomTimeRange(selectedTimeRange.start, newEnd);
-                  }}
-                  className="bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-700 focus:border-blue-500 focus:outline-none"
-                />
+            {/* Price Info */}
+            {candles.length > 0 && (
+              <div className="flex items-center space-x-3 ml-4">
+                <div className="text-white font-medium text-lg">
+                  {candles[candles.length - 1]?.close?.toLocaleString(
+                    undefined,
+                    {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }
+                  )}
+                </div>
+                <div className="text-emerald-400 text-sm font-medium">
+                  +649.90 (+0.45%)
+                </div>
+                {/* <div className="text-gray-400 text-xs">
+                  H: 113,300.00 L: 113,293.80 C: 113,293.80
+                </div> */}
               </div>
             )}
-
-            {/* Data count indicator */}
-            {chartData && (
-              <span className="text-xs text-gray-500 ml-4">
-                Showing {chartData.length} candles
-              </span>
-            )}
           </div>
-        </div>
 
-        <div className="flex items-center space-x-3">
-          {sessionData && (
-            <span className="text-xs text-gray-500">
-              Last updated: {new Date().toLocaleTimeString()}
-            </span>
-          )}
-          <div className="flex items-center space-x-2">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                isConnected ? "bg-green-400" : "bg-red-400"
+          {/* Center: Timeframe + Chart Tools */}
+          <div className="flex-1 flex justify-center items-center space-x-4">
+            {/* Timeframe Selector */}
+            <div className="flex items-center space-x-1">
+              {["1m", "5m", "15m", "1h", "4h", "1d"].map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() =>
+                    handleTimeRangeChange(
+                      tf === "1m" ? "1h" : tf === "5m" ? "4h" : "1d"
+                    )
+                  }
+                  className={`px-2 py-1 text-xs rounded ${
+                    (tf === "1m" && timeRangePreset === "1h") ||
+                    (tf === "5m" && timeRangePreset === "4h") ||
+                    (tf === "1d" && timeRangePreset === "1d")
+                      ? "bg-blue-500 text-white"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+
+            {/* Chart Type Tools */}
+            <div className="flex items-center space-x-1 border-l border-gray-700 pl-4">
+              <button
+                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+                title="Candles"
+              >
+                <TbChartCandle size={16} />
+              </button>
+              <button
+                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+                title="Line"
+              >
+                <TbChartLine size={16} />
+              </button>
+              <button
+                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+                title="Area"
+              >
+                <TbChartArea size={16} />
+              </button>
+            </div>
+
+            {/* Indicators */}
+            <div className="flex items-center space-x-1 border-l border-gray-700 pl-4">
+              <button className="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded">
+                <IoTrendingUp className="inline mr-1" size={14} />
+                Indicators
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Tools and Settings */}
+          <div className="flex items-center space-x-1">
+            {/* Layout Controls */}
+            <button
+              onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
+              className={`p-1.5 rounded ${
+                leftSidebarCollapsed
+                  ? "text-gray-400 hover:text-white hover:bg-gray-800"
+                  : "text-blue-400 bg-gray-800"
               }`}
-            ></div>
-            <span className="text-xs text-gray-500">
-              {isConnected ? "Live" : "Disconnected"}
-            </span>
-          </div>
-          <button
-            onClick={loadData}
-            disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-3 py-1.5 rounded text-xs font-medium"
-          >
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
-          <button
-            onClick={() =>
-              isConnected ? disconnectWebSocket() : connectWebSocket()
-            }
-            className={`px-3 py-1.5 rounded text-xs font-medium ${
-              isConnected
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-green-600 hover:bg-green-700"
-            }`}
-          >
-            {isConnected ? "Disconnect" : "Connect"}
-          </button>
-        </div>
-      </header>
+              title="Watchlist"
+            >
+              <IoWallet size={16} />
+            </button>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex">
-        {/* Left Sidebar */}
-        <aside className="w-56 bg-black border-r border-gray-800 p-3">
-          <h2 className="text-sm font-medium mb-3 text-gray-300">
-            Portfolio Balance
-          </h2>
-          <div className="space-y-2">
-            {sessionData?.balance ? (
-              Object.entries(sessionData.balance)
-                .filter(([, value]) => value > 0)
-                .map(([symbol, amount]) => (
-                  <div key={symbol} className="bg-gray-900 p-2 rounded">
-                    <div className="text-xs text-gray-400">{symbol}</div>
-                    <div className="text-green-400 font-medium text-sm">
-                      {amount.toFixed(symbol === "USDT" ? 2 : 6)}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {symbol === "USDT" ? "USD" : "Available"}
-                    </div>
+            <button
+              onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
+              className={`p-1.5 rounded ${
+                rightSidebarCollapsed
+                  ? "text-gray-400 hover:text-white hover:bg-gray-800"
+                  : "text-blue-400 bg-gray-800"
+              }`}
+              title="Order Book"
+            >
+              <RiBarChartLine size={16} />
+            </button>
+
+            {/* Divider */}
+            <div className="h-6 w-px bg-gray-700 mx-2"></div>
+
+            {/* Action Tools */}
+            <button
+              onClick={() => setShowChat(!showChat)}
+              className={`p-1.5 rounded ${
+                showChat
+                  ? "text-blue-400 bg-gray-800"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+              title="AI Assistant"
+            >
+              <IoChatbubble size={16} />
+            </button>
+
+            <button
+              onClick={() => setShowTrading(!showTrading)}
+              className={`p-1.5 rounded ${
+                showTrading
+                  ? "text-blue-400 bg-gray-800"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`}
+              title="Trading Panel"
+            >
+              <IoBarChart size={16} />
+            </button>
+
+            {/* Status */}
+            <div className="flex items-center space-x-1 mx-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isConnected ? "bg-green-400" : "bg-red-400"
+                }`}
+              ></div>
+              <span className="text-xs text-gray-400">
+                {isConnected ? "Live" : "Offline"}
+              </span>
+            </div>
+
+            {/* More Tools */}
+            <button
+              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+              title="Alerts"
+            >
+              <IoNotifications size={16} />
+            </button>
+
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded disabled:opacity-50"
+              title="Refresh"
+            >
+              <IoRefresh size={16} />
+            </button>
+
+            <button
+              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+              title="Fullscreen"
+            >
+              <RiFullscreenLine size={16} />
+            </button>
+
+            <button
+              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+              title="Settings"
+            >
+              <IoSettings size={16} />
+            </button>
+
+            <button
+              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+              title="More"
+            >
+              <IoEllipsisVertical size={16} />
+            </button>
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex relative">
+          {/* Collapsible Left Sidebar */}
+          {!showChat && !showTrading && !leftSidebarCollapsed && (
+            <aside className="w-64 bg-black border-r border-gray-800 flex flex-col">
+              {/* Tab Headers */}
+              <div className="flex border-b border-gray-800">
+                <button className="flex-1 px-3 py-2 text-xs bg-gray-800 text-white border-r border-gray-700">
+                  Portfolio
+                </button>
+                <button className="flex-1 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-gray-800">
+                  Watchlist
+                </button>
+              </div>
+
+              {/* Portfolio Content */}
+              <div className="flex-1 p-3 overflow-y-auto">
+                {/* Account Summary */}
+                <div className="mb-4 p-3 bg-gray-900 rounded">
+                  <div className="text-xs text-gray-400 mb-1">
+                    Total Balance
                   </div>
-                ))
+                  <div className="text-lg font-medium text-white">
+                    $
+                    {portfolioValue.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                    })}
+                  </div>
+                  <div className="text-xs text-emerald-400">+2.34% today</div>
+                </div>
+
+                {/* Holdings */}
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-gray-300 mb-2">
+                    Holdings
+                  </div>
+                  {balance ? (
+                    Object.entries(balance)
+                      .filter(([, value]) => value > 0)
+                      .map(([sym, amount]) => (
+                        <div
+                          key={sym}
+                          className="flex justify-between items-center p-2 bg-gray-900 rounded text-xs"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-black font-bold text-xs">
+                              {sym.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="text-white font-medium">
+                                {sym}
+                              </div>
+                              <div className="text-gray-400">
+                                {amount.toFixed(sym === "USDT" ? 2 : 6)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-white">
+                              $
+                              {(sym === "USDT"
+                                ? amount
+                                : amount * 50000
+                              ).toFixed(2)}
+                            </div>
+                            <div className="text-emerald-400">+1.2%</div>
+                          </div>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-gray-500 text-xs">Loading...</div>
+                  )}
+                </div>
+              </div>
+            </aside>
+          )}
+
+          {/* Center - Chart Area, Chat, or Trading */}
+          <main className="flex-1 bg-black flex flex-col relative">
+            {showChat ? (
+              <ErrorBoundary>
+                <ChatComponent onClose={() => setShowChat(false)} />
+              </ErrorBoundary>
+            ) : showTrading ? (
+              <ErrorBoundary>
+                <TradingControls
+                  symbol={symbol}
+                  onClose={() => setShowTrading(false)}
+                />
+              </ErrorBoundary>
             ) : (
-              <div className="text-gray-500 text-xs">Loading balance...</div>
+              <ErrorBoundary>
+                {error ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-red-400">Error: {error}</div>
+                  </div>
+                ) : loading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-gray-400">Loading chart data...</div>
+                  </div>
+                ) : (
+                  <>
+                    <ChartComponent
+                      colors={{
+                        backgroundColor: "#000000",
+                        lineColor: "#ffffff",
+                        textColor: "#ffffff",
+                        areaTopColor: "#000000",
+                        areaBottomColor: "#000000",
+                      }}
+                      candleData={chartData}
+                      onSeriesReady={handleSeriesReady}
+                      autoFitContent={true}
+                    />
+
+                    {/* Chart Overlay Info */}
+                    <div className="absolute top-4 left-4 z-10 bg-black bg-opacity-50 rounded p-2">
+                      <div className="text-xs space-y-1">
+                        <div className="text-gray-400">
+                          Volume:{" "}
+                          {candles.length > 0
+                            ? candles[
+                                candles.length - 1
+                              ]?.volume?.toLocaleString() || "N/A"
+                            : "N/A"}
+                        </div>
+                        <div className="text-gray-400">
+                          Candles: {chartData?.length || 0}
+                        </div>
+                        {isConnected && (
+                          <div className="text-emerald-400 text-xs">
+                            ● Live Data
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </ErrorBoundary>
+            )}
+          </main>
+
+          {/* Collapsible Right Sidebar */}
+          {!showChat && !showTrading && !rightSidebarCollapsed && (
+            <aside className="w-72 bg-black border-l border-gray-800 flex flex-col">
+              {/* Tab Headers */}
+              <div className="flex border-b border-gray-800">
+                <button className="flex-1 px-3 py-2 text-xs bg-gray-800 text-white border-r border-gray-700">
+                  Order Book
+                </button>
+                <button className="flex-1 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-gray-800 border-r border-gray-700">
+                  Trades
+                </button>
+                <button className="flex-1 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-gray-800">
+                  Info
+                </button>
+              </div>
+
+              {/* Order Book Content */}
+              <div className="flex-1 p-3 overflow-y-auto">
+                <ErrorBoundary>
+                  {orderBook ? (
+                    <div className="space-y-4">
+                      {/* Market Price */}
+                      <div className="text-center p-2 bg-gray-900 rounded">
+                        <div className="text-lg font-mono text-white">
+                          {orderBook.bids?.[0]?.price?.toLocaleString(
+                            undefined,
+                            {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            }
+                          ) || "N/A"}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          Market Price (USD)
+                        </div>
+                      </div>
+
+                      {/* Asks */}
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-400 mb-2 font-mono">
+                          <span>Price</span>
+                          <span>Size</span>
+                          <span>Total</span>
+                        </div>
+                        <div className="space-y-1">
+                          {orderBook.asks && orderBook.asks.length > 0 ? (
+                            orderBook.asks
+                              .slice(0, 8)
+                              .reverse()
+                              .filter(
+                                (ask) =>
+                                  ask &&
+                                  typeof ask.price === "number" &&
+                                  typeof ask.quantity === "number"
+                              )
+                              .map((ask, i) => (
+                                <div
+                                  key={i}
+                                  className="flex justify-between text-xs font-mono hover:bg-gray-800 p-1 rounded"
+                                >
+                                  <span className="text-red-400">
+                                    {ask.price.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
+                                  </span>
+                                  <span className="text-gray-300">
+                                    {ask.quantity.toFixed(4)}
+                                  </span>
+                                  <span className="text-gray-400">
+                                    {(ask.price * ask.quantity).toFixed(0)}
+                                  </span>
+                                </div>
+                              ))
+                          ) : (
+                            <div className="text-gray-500 text-xs text-center py-4">
+                              No sell orders
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Spread */}
+                      <div className="text-center py-2">
+                        <div className="text-xs text-gray-400">
+                          Spread:{" "}
+                          {orderBook.asks?.length > 0 &&
+                          orderBook.bids?.length > 0 &&
+                          orderBook.asks[0]?.price &&
+                          orderBook.bids[0]?.price
+                            ? `$${(
+                                orderBook.asks[0].price -
+                                orderBook.bids[0].price
+                              ).toFixed(2)}`
+                            : "N/A"}
+                        </div>
+                      </div>
+
+                      {/* Bids */}
+                      <div>
+                        <div className="space-y-1">
+                          {orderBook.bids && orderBook.bids.length > 0 ? (
+                            orderBook.bids
+                              .slice(0, 8)
+                              .filter(
+                                (bid) =>
+                                  bid &&
+                                  typeof bid.price === "number" &&
+                                  typeof bid.quantity === "number"
+                              )
+                              .map((bid, i) => (
+                                <div
+                                  key={i}
+                                  className="flex justify-between text-xs font-mono hover:bg-gray-800 p-1 rounded"
+                                >
+                                  <span className="text-emerald-400">
+                                    {bid.price.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
+                                  </span>
+                                  <span className="text-gray-300">
+                                    {bid.quantity.toFixed(4)}
+                                  </span>
+                                  <span className="text-gray-400">
+                                    {(bid.price * bid.quantity).toFixed(0)}
+                                  </span>
+                                </div>
+                              ))
+                          ) : (
+                            <div className="text-gray-500 text-xs text-center py-4">
+                              No buy orders
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Status */}
+                      <div className="pt-3 border-t border-gray-700 text-xs text-gray-400 text-center">
+                        {isOrderBookStreamConnected ? (
+                          <span className="text-emerald-400">
+                            🟢 Live Updates
+                          </span>
+                        ) : (
+                          <span className="text-red-400">🔴 Disconnected</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-gray-500 text-xs text-center py-8">
+                      Loading order book...
+                    </div>
+                  )}
+                </ErrorBoundary>
+              </div>
+            </aside>
+          )}
+        </div>
+
+        {/* Bottom Toolbar like TradingView */}
+        <footer className="bg-black h-10 border-t border-gray-800 flex items-center px-4">
+          {/* Left: Status and Stats */}
+          <div className="flex items-center space-x-6 text-xs">
+            <div className="flex items-center space-x-2">
+              <span className="text-gray-400">Portfolio:</span>
+              <span className="text-white font-medium">
+                $
+                {portfolioValue.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                })}
+              </span>
+              <span className="text-emerald-400">+2.34%</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-gray-400">Balance:</span>
+              <span className="text-white">
+                ${(balance?.USDT || 0).toFixed(2)}
+              </span>
+            </div>
+            {candles.length > 0 && (
+              <div className="flex items-center space-x-2">
+                <span className="text-gray-400">Vol:</span>
+                <span className="text-white">
+                  {(candles[candles.length - 1]?.volume || 0).toLocaleString()}
+                </span>
+              </div>
             )}
           </div>
-        </aside>
 
-        {/* Center - Chart Area */}
-        <main className="flex-1 bg-black">
-          {error ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-red-400">Error: {error}</div>
-            </div>
-          ) : loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-gray-400">Loading chart data...</div>
-            </div>
-          ) : (
-            <ChartComponent
-              colors={{
-                backgroundColor: "#000000",
-                lineColor: "#ffffff",
-                textColor: "#ffffff",
-                areaTopColor: "#000000",
-                areaBottomColor: "#000000",
-              }}
-              candleData={chartData}
-              onSeriesReady={handleSeriesReady}
-              autoFitContent={true}
-            />
-          )}
-        </main>
-
-        {/* Right Sidebar */}
-        <aside className="w-56 bg-black border-l border-gray-800 p-3">
-          <h2 className="text-sm font-medium mb-3 text-gray-300">Order Book</h2>
-
-          {/* Buy Orders */}
-          <div className="mb-4">
-            <h3 className="text-xs font-medium text-green-400 mb-2">
-              Buy Orders
-            </h3>
-            <div className="space-y-1">
-              {[
-                { price: "43,245.00", amount: "0.125", total: "5,405.63" },
-                { price: "43,240.00", amount: "0.250", total: "10,810.00" },
-                { price: "43,235.00", amount: "0.089", total: "3,847.92" },
-                { price: "43,230.00", amount: "0.456", total: "19,712.88" },
-              ].map((order, i) => (
-                <div key={i} className="flex justify-between text-xs">
-                  <span className="text-green-400">{order.price}</span>
-                  <span className="text-gray-400">{order.amount}</span>
-                  <span className="text-gray-500">{order.total}</span>
-                </div>
-              ))}
+          {/* Center: Data Status */}
+          <div className="flex-1 flex justify-center">
+            <div className="flex items-center space-x-4 text-xs">
+              {chartData && (
+                <span className="text-gray-400">
+                  {chartData.length} candles loaded
+                </span>
+              )}
+              <div className="flex items-center space-x-1">
+                <div
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isCandleStreamConnected ? "bg-green-400" : "bg-red-400"
+                  }`}
+                ></div>
+                <span className="text-gray-400">Price</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <div
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isOrderBookStreamConnected ? "bg-green-400" : "bg-red-400"
+                  }`}
+                ></div>
+                <span className="text-gray-400">Book</span>
+              </div>
             </div>
           </div>
 
-          {/* Sell Orders */}
-          <div>
-            <h3 className="text-xs font-medium text-red-400 mb-2">
-              Sell Orders
-            </h3>
-            <div className="space-y-1">
-              {[
-                { price: "43,255.00", amount: "0.234", total: "10,121.67" },
-                { price: "43,260.00", amount: "0.178", total: "7,700.28" },
-                { price: "43,265.00", amount: "0.345", total: "14,926.43" },
-                { price: "43,270.00", amount: "0.567", total: "24,524.19" },
-              ].map((order, i) => (
-                <div key={i} className="flex justify-between text-xs">
-                  <span className="text-red-400">{order.price}</span>
-                  <span className="text-gray-400">{order.amount}</span>
-                  <span className="text-gray-500">{order.total}</span>
-                </div>
-              ))}
+          {/* Right: Quick Actions */}
+          <div className="flex items-center space-x-2">
+            <div className="flex bg-gray-900 rounded overflow-hidden">
+              <button
+                onClick={() => setShowTrading(true)}
+                className="px-4 py-1 text-xs bg-green-600 hover:bg-green-700 text-white font-medium"
+              >
+                BUY
+              </button>
+              <button
+                onClick={() => setShowTrading(true)}
+                className="px-4 py-1 text-xs bg-red-600 hover:bg-red-700 text-white font-medium"
+              >
+                SELL
+              </button>
             </div>
+            <button
+              onClick={() => setShowChat(true)}
+              className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded font-medium"
+            >
+              AI
+            </button>
           </div>
-        </aside>
+        </footer>
       </div>
-
-      {/* Bottom Panel */}
-      <footer className="bg-black border-t border-gray-800 p-3">
-        <div className="flex justify-between items-center">
-          <div className="flex space-x-6">
-            <div>
-              <span className="text-xs text-gray-500">Portfolio Value: </span>
-              <span className="text-sm font-medium text-green-400">
-                ${portfolioValue.toFixed(2)}
-              </span>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">24h Change: </span>
-              <span className="text-sm font-medium text-gray-400">N/A</span>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">USDT Balance: </span>
-              <span className="text-sm font-medium text-gray-200">
-                ${(sessionData?.balance?.USDT || 0).toFixed(2)}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex space-x-3">
-            <button className="bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded text-xs font-medium">
-              Buy
-            </button>
-            <button className="bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded text-xs font-medium">
-              Sell
-            </button>
-            <button className="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-xs font-medium">
-              Settings
-            </button>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </ErrorBoundary>
   );
 }

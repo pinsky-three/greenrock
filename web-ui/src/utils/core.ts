@@ -1,9 +1,19 @@
 import type { Time } from "lightweight-charts";
 import type {
   ApiCandle,
+  Balance,
   Candle,
+  CandlesQuery,
+  ChatRequest,
+  ChatResponse,
   LatestSessionResponse,
+  Order,
+  OrderBook,
+  OrderBookQuery,
+  PauseResponse,
+  Portfolio,
   TimeRangePresets,
+  Trade,
 } from "../types/core";
 
 // Convert API candles to chart format
@@ -83,11 +93,128 @@ export const getTimeRangePresets = (): TimeRangePresets => {
   return presets;
 };
 
-// Fetch latest session data from API
-export const fetchLatestSession = async (): Promise<LatestSessionResponse> => {
-  const response = await fetch("http://localhost:4200/session");
+// API utility functions for new backend routes
+
+// Chat API
+export const sendChatMessage = async (
+  request: ChatRequest
+): Promise<ChatResponse | PauseResponse> => {
+  const response = await fetch("http://localhost:4200/chat", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
   return response.json();
+};
+
+// Strategy API
+export const fetchPortfolio = async (): Promise<Portfolio> => {
+  const response = await fetch("http://localhost:4200/strategy/portfolio");
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
+
+// Broker API
+export const fetchBalance = async (): Promise<Balance> => {
+  const response = await fetch("http://localhost:4200/broker/balance");
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
+
+export const fetchOpenOrders = async (symbol: string): Promise<Order[]> => {
+  const response = await fetch(
+    `http://localhost:4200/broker/open_orders?${symbol}`
+  );
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
+
+export const fetchTradeHistory = async (symbol: string): Promise<Trade[]> => {
+  const response = await fetch(
+    `http://localhost:4200/broker/trade_history?${symbol}`
+  );
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
+
+export const fetchCandles = async (
+  query: CandlesQuery
+): Promise<{ candles: ApiCandle[] }> => {
+  const params = new URLSearchParams({
+    symbol: query.symbol,
+    interval: query.interval,
+  });
+
+  if (query.start) {
+    params.append("start", query.start);
+  }
+  if (query.end) {
+    params.append("end", query.end);
+  }
+
+  const response = await fetch(
+    `http://localhost:4200/broker/candles?${params}`
+  );
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
+
+export const fetchOrderBook = async (
+  query: OrderBookQuery
+): Promise<OrderBook> => {
+  const params = new URLSearchParams({
+    symbol: query.symbol,
+    depth: query.depth.toString(),
+  });
+
+  const response = await fetch(
+    `http://localhost:4200/broker/order_book?${params}`
+  );
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+};
+
+// WebSocket connection utilities
+export const createCandleStreamWebSocket = (): WebSocket => {
+  return new WebSocket("ws://localhost:4200/broker/candle_stream");
+};
+
+export const createOrderBookStreamWebSocket = (): WebSocket => {
+  return new WebSocket("ws://localhost:4200/broker/order_book_stream");
+};
+
+// Legacy function for backward compatibility
+export const fetchLatestSession = async (): Promise<LatestSessionResponse> => {
+  // Use new endpoints to construct legacy response
+  try {
+    const [balance, candlesResponse] = await Promise.all([
+      fetchBalance(),
+      fetchCandles({ symbol: "BTCUSDT", interval: "1m" }),
+    ]);
+
+    return {
+      session_id: "legacy-session",
+      candles: candlesResponse.candles,
+      balance,
+    };
+  } catch (error) {
+    throw new Error(`Failed to fetch session data: ${error}`);
+  }
 };
