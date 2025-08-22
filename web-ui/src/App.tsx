@@ -421,9 +421,9 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <div className="h-screen w-screen bg-black text-white flex flex-col">
+      <div className="h-screen w-screen bg-neutral-950 text-white flex flex-col">
         {/* TradingView Style Header */}
-        <header className="bg-black h-12 border-b border-gray-800 flex items-center px-3">
+        <header className="bg-neutral-950 h-12 border-b border-gray-800 flex items-center px-3">
           {/* Left: Logo + Symbol Search */}
           <div className="flex items-center space-x-3">
             {/* Logo placeholder */}
@@ -432,16 +432,16 @@ export default function App() {
             </div>
 
             {/* Symbol Search */}
-            <div className="flex items-center bg-gray-950 rounded border-0 hover:border-gray-600 px-3 py-1.5">
-              <IoSearch className="text-gray-400 mr-2" size={16} />
+            <div className="flex items-center bg-neutral-950 rounded border-0 hover:border-gray-600 px-3 py-1.5">
+              <IoSearch className="text-neutral-400 mr-2" size={16} />
               <span className="text-white font-medium">{symbol}</span>
               {/* <span className="text-yellow-400 ml-2 text-xs font-medium">
                 BINANCE
               </span> */}
-              {/* <span className="text-gray-500 mx-1">•</span>
-              <span className="text-gray-400 text-xs">1</span>
-              <span className="text-gray-500 mx-1">•</span>
-              <span className="text-gray-400 text-xs uppercase">Crypto</span> */}
+              {/* <span className="text-neutral-500 mx-1">•</span>
+              <span className="text-neutral-400 text-xs">1</span>
+              <span className="text-neutral-500 mx-1">•</span>
+              <span className="text-neutral-400 text-xs uppercase">Crypto</span> */}
             </div>
 
             {/* Price Info */}
@@ -459,7 +459,7 @@ export default function App() {
                 <div className="text-emerald-400 text-sm font-medium">
                   +649.90 (+0.45%)
                 </div>
-                {/* <div className="text-gray-400 text-xs">
+                {/* <div className="text-neutral-400 text-xs">
                   H: 113,300.00 L: 113,293.80 C: 113,293.80
                 </div> */}
               </div>
@@ -469,7 +469,7 @@ export default function App() {
           {/* Center: Timeframe + Chart Tools */}
           <div className="flex-1 flex justify-center items-center space-x-4">
             {/* Timeframe Selector */}
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 h-full">
               {["1m", "5m", "15m", "1h", "4h", "1d"].map((tf) => (
                 <button
                   key={tf}
@@ -478,12 +478,12 @@ export default function App() {
                       tf === "1m" ? "1h" : tf === "5m" ? "4h" : "1d"
                     )
                   }
-                  className={`px-2 py-1 text-xs rounded ${
+                  className={`px-2 h-full text-xs rounded ${
                     (tf === "1m" && timeRangePreset === "1h") ||
                     (tf === "5m" && timeRangePreset === "4h") ||
                     (tf === "1d" && timeRangePreset === "1d")
-                      ? "bg-blue-500 text-white"
-                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                      ? "bg-neutral-800 text-white"
+                      : "text-neutral-400 hover:text-white hover:bg-neutral-800"
                   }`}
                 >
                   {tf}
@@ -494,19 +494,19 @@ export default function App() {
             {/* Chart Type Tools */}
             <div className="flex items-center space-x-1 border-l border-gray-700 pl-4">
               <button
-                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+                className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
                 title="Candles"
               >
                 <TbChartCandle size={16} />
               </button>
               <button
-                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+                className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
                 title="Line"
               >
                 <TbChartLine size={16} />
               </button>
               <button
-                className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+                className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
                 title="Area"
               >
                 <TbChartArea size={16} />
@@ -515,7 +515,7 @@ export default function App() {
 
             {/* Indicators */}
             <div className="flex items-center space-x-1 border-l border-gray-700 pl-4">
-              <button className="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded">
+              <button className="px-2 py-1 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800 rounded">
                 <IoTrendingUp className="inline mr-1" size={14} />
                 Indicators
               </button>
@@ -529,8 +529,8 @@ export default function App() {
               onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
               className={`p-1.5 rounded ${
                 leftSidebarCollapsed
-                  ? "text-gray-400 hover:text-white hover:bg-gray-800"
-                  : "text-blue-400 bg-gray-800"
+                  ? "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                  : "text-blue-400 bg-neutral-800"
               }`}
               title="Watchlist"
             >
@@ -541,8 +541,8 @@ export default function App() {
               onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
               className={`p-1.5 rounded ${
                 rightSidebarCollapsed
-                  ? "text-gray-400 hover:text-white hover:bg-gray-800"
-                  : "text-blue-400 bg-gray-800"
+                  ? "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                  : "text-blue-400 bg-neutral-800"
               }`}
               title="Order Book"
             >
@@ -550,15 +550,15 @@ export default function App() {
             </button>
 
             {/* Divider */}
-            <div className="h-6 w-px bg-gray-700 mx-2"></div>
+            <div className="h-6 w-px bg-neutral-700 mx-2"></div>
 
             {/* Action Tools */}
             <button
               onClick={() => setShowChat(!showChat)}
               className={`p-1.5 rounded ${
                 showChat
-                  ? "text-blue-400 bg-gray-800"
-                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  ? "text-blue-400 bg-neutral-800"
+                  : "text-neutral-400 hover:text-white hover:bg-neutral-800"
               }`}
               title="AI Assistant"
             >
@@ -569,8 +569,8 @@ export default function App() {
               onClick={() => setShowTrading(!showTrading)}
               className={`p-1.5 rounded ${
                 showTrading
-                  ? "text-blue-400 bg-gray-800"
-                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  ? "text-blue-400 bg-neutral-800"
+                  : "text-neutral-400 hover:text-white hover:bg-neutral-800"
               }`}
               title="Trading Panel"
             >
@@ -584,14 +584,14 @@ export default function App() {
                   isConnected ? "bg-green-400" : "bg-red-400"
                 }`}
               ></div>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-neutral-400">
                 {isConnected ? "Live" : "Offline"}
               </span>
             </div>
 
             {/* More Tools */}
             <button
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
               title="Alerts"
             >
               <IoNotifications size={16} />
@@ -600,28 +600,28 @@ export default function App() {
             <button
               onClick={loadData}
               disabled={loading}
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded disabled:opacity-50"
+              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded disabled:opacity-50"
               title="Refresh"
             >
               <IoRefresh size={16} />
             </button>
 
             <button
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
               title="Fullscreen"
             >
               <RiFullscreenLine size={16} />
             </button>
 
             <button
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
               title="Settings"
             >
               <IoSettings size={16} />
             </button>
 
             <button
-              className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded"
+              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
               title="More"
             >
               <IoEllipsisVertical size={16} />
@@ -633,13 +633,13 @@ export default function App() {
         <div className="flex-1 flex relative">
           {/* Collapsible Left Sidebar */}
           {!showChat && !showTrading && !leftSidebarCollapsed && (
-            <aside className="w-64 bg-black border-r border-gray-800 flex flex-col">
+            <aside className="w-64 bg-neutral-950 border-r border-gray-800 flex flex-col">
               {/* Tab Headers */}
               <div className="flex border-b border-gray-800">
-                <button className="flex-1 px-3 py-2 text-xs bg-gray-800 text-white border-r border-gray-700">
+                <button className="flex-1 px-3 py-2 text-xs bg-neutral-800 text-white border-r border-gray-700">
                   Portfolio
                 </button>
-                <button className="flex-1 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-gray-800">
+                <button className="flex-1 px-3 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800">
                   Watchlist
                 </button>
               </div>
@@ -647,8 +647,8 @@ export default function App() {
               {/* Portfolio Content */}
               <div className="flex-1 p-3 overflow-y-auto">
                 {/* Account Summary */}
-                <div className="mb-4 p-3 bg-gray-900 rounded">
-                  <div className="text-xs text-gray-400 mb-1">
+                <div className="mb-4 p-3 bg-neutral-900 rounded">
+                  <div className="text-xs text-neutral-400 mb-1">
                     Total Balance
                   </div>
                   <div className="text-lg font-medium text-white">
@@ -662,7 +662,7 @@ export default function App() {
 
                 {/* Holdings */}
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-gray-300 mb-2">
+                  <div className="text-xs font-medium text-neutral-300 mb-2">
                     Holdings
                   </div>
                   {balance ? (
@@ -671,7 +671,7 @@ export default function App() {
                       .map(([sym, amount]) => (
                         <div
                           key={sym}
-                          className="flex justify-between items-center p-2 bg-gray-900 rounded text-xs"
+                          className="flex justify-between items-center p-2 bg-neutral-900 rounded text-xs"
                         >
                           <div className="flex items-center space-x-2">
                             <div className="w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center text-black font-bold text-xs">
@@ -681,7 +681,7 @@ export default function App() {
                               <div className="text-white font-medium">
                                 {sym}
                               </div>
-                              <div className="text-gray-400">
+                              <div className="text-neutral-400">
                                 {amount.toFixed(sym === "USDT" ? 2 : 6)}
                               </div>
                             </div>
@@ -699,7 +699,7 @@ export default function App() {
                         </div>
                       ))
                   ) : (
-                    <div className="text-gray-500 text-xs">Loading...</div>
+                    <div className="text-neutral-500 text-xs">Loading...</div>
                   )}
                 </div>
               </div>
@@ -707,7 +707,7 @@ export default function App() {
           )}
 
           {/* Center - Chart Area, Chat, or Trading */}
-          <main className="flex-1 bg-black flex flex-col relative">
+          <main className="flex-1 bg-neutral-950 flex flex-col relative">
             {showChat ? (
               <ErrorBoundary>
                 <ChatComponent onClose={() => setShowChat(false)} />
@@ -727,7 +727,9 @@ export default function App() {
                   </div>
                 ) : loading ? (
                   <div className="flex items-center justify-center h-full">
-                    <div className="text-gray-400">Loading chart data...</div>
+                    <div className="text-neutral-400">
+                      Loading chart data...
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -745,9 +747,9 @@ export default function App() {
                     />
 
                     {/* Chart Overlay Info */}
-                    <div className="absolute top-4 left-4 z-10 bg-black bg-opacity-50 rounded p-2">
+                    <div className="absolute top-4 left-4 z-10 bg-neutral-950 bg-opacity-50 rounded p-2">
                       <div className="text-xs space-y-1">
-                        <div className="text-gray-400">
+                        <div className="text-neutral-400">
                           Volume:{" "}
                           {candles.length > 0
                             ? candles[
@@ -755,7 +757,7 @@ export default function App() {
                               ]?.volume?.toLocaleString() || "N/A"
                             : "N/A"}
                         </div>
-                        <div className="text-gray-400">
+                        <div className="text-neutral-400">
                           Candles: {chartData?.length || 0}
                         </div>
                         {isConnected && (
@@ -773,16 +775,16 @@ export default function App() {
 
           {/* Collapsible Right Sidebar */}
           {!showChat && !showTrading && !rightSidebarCollapsed && (
-            <aside className="w-72 bg-black border-l border-gray-800 flex flex-col">
+            <aside className="w-72 bg-neutral-950 border-l border-gray-800 flex flex-col">
               {/* Tab Headers */}
               <div className="flex border-b border-gray-800">
-                <button className="flex-1 px-3 py-2 text-xs bg-gray-800 text-white border-r border-gray-700">
+                <button className="flex-1 px-3 py-2 text-xs bg-neutral-800 text-white border-r border-gray-700">
                   Order Book
                 </button>
-                <button className="flex-1 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-gray-800 border-r border-gray-700">
+                <button className="flex-1 px-3 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800 border-r border-gray-700">
                   Trades
                 </button>
-                <button className="flex-1 px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-gray-800">
+                <button className="flex-1 px-3 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800">
                   Info
                 </button>
               </div>
@@ -793,7 +795,7 @@ export default function App() {
                   {orderBook ? (
                     <div className="space-y-4">
                       {/* Market Price */}
-                      <div className="text-center p-2 bg-gray-900 rounded">
+                      <div className="text-center p-2 bg-neutral-900 rounded">
                         <div className="text-lg font-mono text-white">
                           {orderBook.bids?.[0]?.price?.toLocaleString(
                             undefined,
@@ -803,14 +805,14 @@ export default function App() {
                             }
                           ) || "N/A"}
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-neutral-400">
                           Market Price (USD)
                         </div>
                       </div>
 
                       {/* Asks */}
                       <div>
-                        <div className="flex justify-between text-xs text-gray-400 mb-2 font-mono">
+                        <div className="flex justify-between text-xs text-neutral-400 mb-2 font-mono">
                           <span>Price</span>
                           <span>Size</span>
                           <span>Total</span>
@@ -829,7 +831,7 @@ export default function App() {
                               .map((ask, i) => (
                                 <div
                                   key={i}
-                                  className="flex justify-between text-xs font-mono hover:bg-gray-800 p-1 rounded"
+                                  className="flex justify-between text-xs font-mono hover:bg-neutral-800 p-1 rounded"
                                 >
                                   <span className="text-red-400">
                                     {ask.price.toLocaleString(undefined, {
@@ -837,16 +839,16 @@ export default function App() {
                                       maximumFractionDigits: 2,
                                     })}
                                   </span>
-                                  <span className="text-gray-300">
+                                  <span className="text-neutral-300">
                                     {ask.quantity.toFixed(4)}
                                   </span>
-                                  <span className="text-gray-400">
+                                  <span className="text-neutral-400">
                                     {(ask.price * ask.quantity).toFixed(0)}
                                   </span>
                                 </div>
                               ))
                           ) : (
-                            <div className="text-gray-500 text-xs text-center py-4">
+                            <div className="text-neutral-500 text-xs text-center py-4">
                               No sell orders
                             </div>
                           )}
@@ -855,7 +857,7 @@ export default function App() {
 
                       {/* Spread */}
                       <div className="text-center py-2">
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-neutral-400">
                           Spread:{" "}
                           {orderBook.asks?.length > 0 &&
                           orderBook.bids?.length > 0 &&
@@ -884,7 +886,7 @@ export default function App() {
                               .map((bid, i) => (
                                 <div
                                   key={i}
-                                  className="flex justify-between text-xs font-mono hover:bg-gray-800 p-1 rounded"
+                                  className="flex justify-between text-xs font-mono hover:bg-neutral-800 p-1 rounded"
                                 >
                                   <span className="text-emerald-400">
                                     {bid.price.toLocaleString(undefined, {
@@ -892,16 +894,16 @@ export default function App() {
                                       maximumFractionDigits: 2,
                                     })}
                                   </span>
-                                  <span className="text-gray-300">
+                                  <span className="text-neutral-300">
                                     {bid.quantity.toFixed(4)}
                                   </span>
-                                  <span className="text-gray-400">
+                                  <span className="text-neutral-400">
                                     {(bid.price * bid.quantity).toFixed(0)}
                                   </span>
                                 </div>
                               ))
                           ) : (
-                            <div className="text-gray-500 text-xs text-center py-4">
+                            <div className="text-neutral-500 text-xs text-center py-4">
                               No buy orders
                             </div>
                           )}
@@ -909,7 +911,7 @@ export default function App() {
                       </div>
 
                       {/* Status */}
-                      <div className="pt-3 border-t border-gray-700 text-xs text-gray-400 text-center">
+                      <div className="pt-3 border-t border-gray-700 text-xs text-neutral-400 text-center">
                         {isOrderBookStreamConnected ? (
                           <span className="text-emerald-400">
                             🟢 Live Updates
@@ -920,7 +922,7 @@ export default function App() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-gray-500 text-xs text-center py-8">
+                    <div className="text-neutral-500 text-xs text-center py-8">
                       Loading order book...
                     </div>
                   )}
@@ -931,11 +933,11 @@ export default function App() {
         </div>
 
         {/* Bottom Toolbar like TradingView */}
-        <footer className="bg-black h-10 border-t border-gray-800 flex items-center px-4">
+        <footer className="bg-neutral-950 h-10 border-t border-gray-800 flex items-center px-4">
           {/* Left: Status and Stats */}
           <div className="flex items-center space-x-6 text-xs">
             <div className="flex items-center space-x-2">
-              <span className="text-gray-400">Portfolio:</span>
+              <span className="text-neutral-400">Portfolio:</span>
               <span className="text-white font-medium">
                 $
                 {portfolioValue.toLocaleString(undefined, {
@@ -945,14 +947,14 @@ export default function App() {
               <span className="text-emerald-400">+2.34%</span>
             </div>
             <div className="flex items-center space-x-2">
-              <span className="text-gray-400">Balance:</span>
+              <span className="text-neutral-400">Balance:</span>
               <span className="text-white">
                 ${(balance?.USDT || 0).toFixed(2)}
               </span>
             </div>
             {candles.length > 0 && (
               <div className="flex items-center space-x-2">
-                <span className="text-gray-400">Vol:</span>
+                <span className="text-neutral-400">Vol:</span>
                 <span className="text-white">
                   {(candles[candles.length - 1]?.volume || 0).toLocaleString()}
                 </span>
@@ -964,7 +966,7 @@ export default function App() {
           <div className="flex-1 flex justify-center">
             <div className="flex items-center space-x-4 text-xs">
               {chartData && (
-                <span className="text-gray-400">
+                <span className="text-neutral-400">
                   {chartData.length} candles loaded
                 </span>
               )}
@@ -974,7 +976,7 @@ export default function App() {
                     isCandleStreamConnected ? "bg-green-400" : "bg-red-400"
                   }`}
                 ></div>
-                <span className="text-gray-400">Price</span>
+                <span className="text-neutral-400">Price</span>
               </div>
               <div className="flex items-center space-x-1">
                 <div
@@ -982,14 +984,14 @@ export default function App() {
                     isOrderBookStreamConnected ? "bg-green-400" : "bg-red-400"
                   }`}
                 ></div>
-                <span className="text-gray-400">Book</span>
+                <span className="text-neutral-400">Book</span>
               </div>
             </div>
           </div>
 
           {/* Right: Quick Actions */}
           <div className="flex items-center space-x-2">
-            <div className="flex bg-gray-900 rounded overflow-hidden">
+            <div className="flex bg-neutral-900 rounded overflow-hidden">
               <button
                 onClick={() => setShowTrading(true)}
                 className="px-4 py-1 text-xs bg-green-600 hover:bg-green-700 text-white font-medium"
