@@ -240,7 +240,7 @@ export const ChartComponent = (props: {
         const volumePoint = {
           time: latestCandle.time,
           value: latestCandle.volume,
-          color: isUp ? "#26a69a" : "#ef5350",
+          color: isUp ? "#26a69a90" : "#ef535090",
         };
         if (volumeSeriesRef.current)
           volumeSeriesRef.current.update(volumePoint);
@@ -260,7 +260,7 @@ export const ChartComponent = (props: {
         const volumePoint = {
           time: latestCandle.time,
           value: latestCandle.volume,
-          color: isUp ? "#26a69a" : "#ef5350",
+          color: isUp ? "#26a69a90" : "#ef535090",
         };
         if (volumeSeriesRef.current)
           volumeSeriesRef.current.update(volumePoint);
