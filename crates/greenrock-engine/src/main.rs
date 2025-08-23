@@ -14,7 +14,7 @@ use graph_flow::{
     PostgresSessionStorage, Session, SessionStorage,
 };
 
-use greenrock::{
+use greenrock_engine::{
     analysis::graph::setup_graph,
     brokers::binance::BinanceBroker,
     models::timeseries::Candle,
