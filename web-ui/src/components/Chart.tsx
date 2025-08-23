@@ -9,13 +9,6 @@ import { useEffect, useRef } from "react";
 import type { Candle } from "../types/core";
 
 export const ChartComponent = (props: {
-  // colors: {
-  //   backgroundColor: string;
-  //   lineColor: string;
-  //   textColor: string;
-  //   areaTopColor: string;
-  //   areaBottomColor: string;
-  // };
   candleData?: Candle[];
   onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
   autoFitContent?: boolean;
@@ -80,11 +73,6 @@ export const ChartComponent = (props: {
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
-
-    // console.log(
-    //   "DEBUG: Chart created with candleData length",
-    //   candleData?.length
-    // );
 
     const handleResize = () => {
       if (chartRef.current) {
@@ -159,15 +147,10 @@ export const ChartComponent = (props: {
       ma50SeriesRef.current = ma50Series;
       ma200SeriesRef.current = ma200Series;
 
-      // Notify parent component that series is ready for real-time updates
       if (onSeriesReady) {
         onSeriesReady(series);
       }
 
-      // Initial setup - force large spacing to see individual candles
-      // console.log(
-      //   "DEBUG: Chart created, applying LARGE spacing for 500 candles in 8 hours"
-      // );
       chart.timeScale().applyOptions({
         barSpacing: 10,
         rightOffset: 5,
@@ -188,17 +171,8 @@ export const ChartComponent = (props: {
       const previousDataLength = previousDataLengthRef.current;
 
       if (isInitialLoadRef.current) {
-        // Initial load - always use setData for all historical data
-        // console.log(
-        //   "Chart: Initial load: setting",
-        //   currentDataLength,
-        //   "candles"
-        // );
-        // console.log("Chart: First candle:", candleData[0]);
-        // console.log("Chart: Last candle:", candleData[candleData.length - 1]);
         seriesRef.current.setData(candleData);
 
-        // Calculate and set moving average data
         const ma20Data = calculateMovingAverage(candleData, 20);
         const ma50Data = calculateMovingAverage(candleData, 50);
         const ma200Data = calculateMovingAverage(candleData, 200);
@@ -209,20 +183,14 @@ export const ChartComponent = (props: {
 
         previousDataLengthRef.current = currentDataLength;
         isInitialLoadRef.current = false;
-        // Set initial position to show recent data, but allow full zoom out
+
         if (chartRef.current) {
-          // Position to show recent data but don't restrict zoom limits
           chartRef.current.timeScale().scrollToPosition(5, true);
-          // chartRef.current.timeScale().
-          // chartRef.current.timeScale().scrollToRealTime();
         }
       } else if (currentDataLength > previousDataLength) {
-        // New data added - use update for the latest candle
-        // console.log("New candle added, updating latest");
         const latestCandle = candleData[candleData.length - 1];
         seriesRef.current.update(latestCandle);
 
-        // Update moving averages for new data
         updateMovingAverages(candleData, currentDataLength - 1);
 
         previousDataLengthRef.current = currentDataLength;
@@ -230,19 +198,13 @@ export const ChartComponent = (props: {
         currentDataLength === previousDataLength &&
         previousDataLength > 0
       ) {
-        // Same length, but data might have changed (e.g., last candle updated)
-        // console.log("Updating existing candle");
         const latestCandle = candleData[candleData.length - 1];
         seriesRef.current.update(latestCandle);
 
-        // Update moving averages for modified data
         updateMovingAverages(candleData, currentDataLength - 1);
       } else {
-        // Data length changed significantly - full reset needed
-        // console.log("Full reset: setting", currentDataLength, "candles");
         seriesRef.current.setData(candleData);
 
-        // Recalculate and set all moving average data
         const ma20Data = calculateMovingAverage(candleData, 20);
         const ma50Data = calculateMovingAverage(candleData, 50);
         const ma200Data = calculateMovingAverage(candleData, 200);
@@ -256,7 +218,6 @@ export const ChartComponent = (props: {
     }
   }, [candleData, autoFitContent]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (chartRef.current) {
