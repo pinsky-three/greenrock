@@ -29,6 +29,7 @@ export const convertApiCandlesToChart = (apiCandles: ApiCandle[]): Candle[] => {
     high: candle.high,
     low: candle.low,
     close: candle.close,
+    volume: candle.volume,
   }));
 
   // console.log(
