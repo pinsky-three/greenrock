@@ -36,6 +36,22 @@ use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
+#[derive(Clone)]
+struct AppState {
+    flow_runner: Arc<FlowRunner>,
+    session_storage: Arc<dyn SessionStorage>,
+    live_loop_runner: Arc<Runner<HashMap<String, f64>, BinanceBroker, MinimalStrategy>>,
+    greenrock_session: Arc<GreenrockSession>,
+}
+
+fn internal_error(message: &str) -> Response {
+    (StatusCode::INTERNAL_SERVER_ERROR, message.to_string()).into_response()
+}
+
+async fn health_check(State(_state): State<AppState>) -> &'static str {
+    &"OK"
+}
+
 #[derive(Debug, Deserialize)]
 struct ChatRequest {
     query: String,
@@ -55,28 +71,6 @@ struct PauseResponse {
     status: String,
     next_task: String,
     reason: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct CandlesQuery {
-    symbol: String,
-    interval: String,
-    start: Option<String>,
-    end: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct OrderBookQuery {
-    symbol: String,
-    depth: u64,
-}
-
-fn internal_error(message: &str) -> Response {
-    (StatusCode::INTERNAL_SERVER_ERROR, message.to_string()).into_response()
-}
-
-async fn health_check(State(_state): State<AppState>) -> &'static str {
-    &"OK"
 }
 
 async fn chat(State(state): State<AppState>, Json(params): Json<ChatRequest>) -> Response {
@@ -177,8 +171,18 @@ async fn get_balance(State(state): State<AppState>) -> Response {
     }
 }
 
-async fn get_open_orders(State(state): State<AppState>, symbol: Query<String>) -> Response {
-    match tokio::task::spawn_blocking(move || state.live_loop_runner.open_orders(&symbol)).await {
+#[derive(Deserialize)]
+struct OpenOrdersQuery {
+    symbol: String,
+}
+
+async fn get_open_orders(
+    State(state): State<AppState>,
+    Query(params): Query<OpenOrdersQuery>,
+) -> Response {
+    match tokio::task::spawn_blocking(move || state.live_loop_runner.open_orders(&params.symbol))
+        .await
+    {
         Ok(orders) => Json(orders).into_response(),
         Err(e) => {
             error!("Failed to get open orders: {}", e);
@@ -187,8 +191,18 @@ async fn get_open_orders(State(state): State<AppState>, symbol: Query<String>) -
     }
 }
 
-async fn get_trade_history(State(state): State<AppState>, symbol: Query<String>) -> Response {
-    match tokio::task::spawn_blocking(move || state.live_loop_runner.trade_history(&symbol)).await {
+#[derive(Deserialize)]
+struct TradeHistoryQuery {
+    symbol: String,
+}
+
+async fn get_trade_history(
+    State(state): State<AppState>,
+    Query(params): Query<TradeHistoryQuery>,
+) -> Response {
+    match tokio::task::spawn_blocking(move || state.live_loop_runner.trade_history(&params.symbol))
+        .await
+    {
         Ok(history) => Json(history).into_response(),
         Err(e) => {
             error!("Failed to get trade history: {}", e);
@@ -206,14 +220,6 @@ struct GreenrockSession {
     _balance: HashMap<String, f64>,
 }
 
-#[derive(Clone)]
-struct AppState {
-    flow_runner: Arc<FlowRunner>,
-    session_storage: Arc<dyn SessionStorage>,
-    live_loop_runner: Arc<Runner<HashMap<String, f64>, BinanceBroker, MinimalStrategy>>,
-    greenrock_session: Arc<GreenrockSession>,
-}
-
 async fn get_portfolio(State(state): State<AppState>) -> Response {
     match tokio::task::spawn_blocking(move || state.live_loop_runner.portfolio()).await {
         Ok(portfolio) => Json(portfolio).into_response(),
@@ -222,6 +228,14 @@ async fn get_portfolio(State(state): State<AppState>) -> Response {
             internal_error("Failed to get portfolio")
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct CandlesQuery {
+    symbol: String,
+    interval: String,
+    start: Option<String>,
+    end: Option<String>,
 }
 
 async fn get_candles(
@@ -257,6 +271,12 @@ async fn get_candle_stream(State(state): State<AppState>, ws: WebSocketUpgrade) 
 
 async fn get_order_book_stream(State(state): State<AppState>, ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(move |socket| handle_depth_socket_stream(socket, state))
+}
+
+#[derive(Debug, Deserialize)]
+struct OrderBookQuery {
+    symbol: String,
+    depth: u64,
 }
 
 async fn get_order_book(
