@@ -6,7 +6,6 @@ import type {
   CandlesQuery,
   ChatRequest,
   ChatResponse,
-  LatestSessionResponse,
   Order,
   OrderBook,
   OrderBookQuery,
@@ -18,11 +17,11 @@ import type {
 
 // Convert API candles to chart format
 export const convertApiCandlesToChart = (apiCandles: ApiCandle[]): Candle[] => {
-  console.log("Converting candles:", apiCandles.length, "samples:");
-  if (apiCandles.length > 0) {
-    console.log("First candle:", apiCandles[0]);
-    console.log("Last candle:", apiCandles[apiCandles.length - 1]);
-  }
+  // console.log("Converting candles:", apiCandles.length, "samples:");
+  // if (apiCandles.length > 0) {
+  //   console.log("First candle:", apiCandles[0]);
+  //   console.log("Last candle:", apiCandles[apiCandles.length - 1]);
+  // }
 
   const converted = apiCandles.map((candle) => ({
     time: Math.floor(candle.timestamp / 1000) as Time,
@@ -32,12 +31,12 @@ export const convertApiCandlesToChart = (apiCandles: ApiCandle[]): Candle[] => {
     close: candle.close,
   }));
 
-  console.log(
-    "Converted result:",
-    converted.length,
-    "first converted:",
-    converted[0]
-  );
+  // console.log(
+  //   "Converted result:",
+  //   converted.length,
+  //   "first converted:",
+  //   converted[0]
+  // );
   return converted;
 };
 
@@ -50,17 +49,17 @@ export const filterCandlesByTimeRange = (
   const startTimestamp = Math.floor(startTime.getTime() / 1000);
   const endTimestamp = Math.floor(endTime.getTime() / 1000);
 
-  console.log(
-    `Filtering ${candles.length} candles between ${startTimestamp} and ${endTimestamp}`
-  );
-  if (candles.length > 0) {
-    console.log(
-      "First candle time:",
-      candles[0].time,
-      "Last candle time:",
-      candles[candles.length - 1].time
-    );
-  }
+  // console.log(
+  //   `Filtering ${candles.length} candles between ${startTimestamp} and ${endTimestamp}`
+  // );
+  // if (candles.length > 0) {
+  //   console.log(
+  //     "First candle time:",
+  //     candles[0].time,
+  //     "Last candle time:",
+  //     candles[candles.length - 1].time
+  //   );
+  // }
 
   const filtered = candles.filter((candle) => {
     let candleTime: number;
@@ -231,21 +230,21 @@ export const createOrderBookStreamWebSocket = (): WebSocket => {
   return new WebSocket("ws://localhost:4200/broker/order_book_stream");
 };
 
-// Legacy function for backward compatibility
-export const fetchLatestSession = async (): Promise<LatestSessionResponse> => {
-  // Use new endpoints to construct legacy response
-  try {
-    const [balance, candlesResponse] = await Promise.all([
-      fetchBalance(),
-      fetchCandles({ symbol: "BTCUSDT", interval: "1m" }),
-    ]);
+// // Legacy function for backward compatibility
+// export const fetchLatestSession = async (): Promise<LatestSessionResponse> => {
+//   // Use new endpoints to construct legacy response
+//   try {
+//     const [balance, candlesResponse] = await Promise.all([
+//       fetchBalance(),
+//       fetchCandles({ symbol: "BTCUSDT", interval: "1m" }),
+//     ]);
 
-    return {
-      session_id: "legacy-session",
-      candles: candlesResponse.candles,
-      balance,
-    };
-  } catch (error) {
-    throw new Error(`Failed to fetch session data: ${error}`);
-  }
-};
+//     return {
+//       session_id: "legacy-session",
+//       candles: candlesResponse.candles,
+//       balance,
+//     };
+//   } catch (error) {
+//     throw new Error(`Failed to fetch session data: ${error}`);
+//   }
+// };

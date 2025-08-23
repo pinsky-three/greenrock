@@ -4,18 +4,18 @@ import {
   ColorType,
   CandlestickSeries,
 } from "lightweight-charts";
-import type { ISeriesApi, IChartApi } from "lightweight-charts";
+import type { ISeriesApi, IChartApi, Time } from "lightweight-charts";
 import { useEffect, useRef } from "react";
 import type { Candle } from "../types/core";
 
 export const ChartComponent = (props: {
-  colors: {
-    backgroundColor: string;
-    lineColor: string;
-    textColor: string;
-    areaTopColor: string;
-    areaBottomColor: string;
-  };
+  // colors: {
+  //   backgroundColor: string;
+  //   lineColor: string;
+  //   textColor: string;
+  //   areaTopColor: string;
+  //   areaBottomColor: string;
+  // };
   candleData?: Candle[];
   onSeriesReady?: (series: ISeriesApi<"Candlestick">) => void;
   autoFitContent?: boolean;
@@ -31,6 +31,11 @@ export const ChartComponent = (props: {
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
+
+    // console.log(
+    //   "DEBUG: Chart created with candleData length",
+    //   candleData?.length
+    // );
 
     const handleResize = () => {
       if (chartRef.current) {
@@ -59,9 +64,9 @@ export const ChartComponent = (props: {
         timeScale: {
           borderColor: "#333333",
           timeVisible: true,
-          barSpacing: 15,
-          minBarSpacing: 10,
-          rightOffset: 10,
+          barSpacing: 50, // Much larger spacing to see individual candles
+          minBarSpacing: 20,
+          rightOffset: 100,
           fixLeftEdge: false,
           fixRightEdge: false,
         },
@@ -88,10 +93,13 @@ export const ChartComponent = (props: {
         onSeriesReady(series);
       }
 
-      // Initial setup with better spacing
+      // Initial setup - force large spacing to see individual candles
+      // console.log(
+      //   "DEBUG: Chart created, applying LARGE spacing for 500 candles in 8 hours"
+      // );
       chart.timeScale().applyOptions({
-        barSpacing: 15,
-        rightOffset: 10,
+        barSpacing: 50,
+        rightOffset: 100,
       });
     }
 
@@ -110,23 +118,32 @@ export const ChartComponent = (props: {
 
       if (isInitialLoadRef.current) {
         // Initial load - always use setData for all historical data
-        console.log("Initial load: setting", currentDataLength, "candles");
+        // console.log(
+        //   "Chart: Initial load: setting",
+        //   currentDataLength,
+        //   "candles"
+        // );
+        // console.log("Chart: First candle:", candleData[0]);
+        // console.log("Chart: Last candle:", candleData[candleData.length - 1]);
         seriesRef.current.setData(candleData);
         previousDataLengthRef.current = currentDataLength;
         isInitialLoadRef.current = false;
-
-        // Auto-fit content on initial load with proper spacing
-        if (autoFitContent && chartRef.current) {
-          chartRef.current.timeScale().fitContent();
-          // Apply better spacing after fitting
-          setTimeout(() => {
-            if (chartRef.current) {
-              chartRef.current.timeScale().applyOptions({
-                barSpacing: 15,
-                rightOffset: 10,
-              });
-            }
-          }, 100);
+        // Explicitly set visible time range to show last 200 candles on load
+        if (chartRef.current) {
+          const lastIndex = candleData.length - 1;
+          const startIndex = Math.max(0, lastIndex - 200);
+          const fromTime = candleData[startIndex].time as Time;
+          const toTime = candleData[lastIndex].time as Time;
+          // console.log(
+          //   "Chart: setVisibleRange from",
+          //   fromTime,
+          //   "to",
+          //   toTime,
+          //   `(showing ${lastIndex - startIndex + 1} candles)`
+          // );
+          chartRef.current
+            .timeScale()
+            .setVisibleRange({ from: fromTime, to: toTime });
         }
       } else if (currentDataLength > previousDataLength) {
         // New data added - use update for the latest candle

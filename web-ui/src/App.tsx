@@ -5,7 +5,6 @@ import type {
   Balance,
   OrderBook,
   // Portfolio,
-  TimeRange,
 } from "./types/core";
 import { ChartComponent } from "./components/Chart";
 import { ChatComponent } from "./components/Chat";
@@ -28,13 +27,11 @@ import { TbChartCandle, TbChartLine, TbChartArea } from "react-icons/tb";
 import {
   convertApiCandlesToChart,
   createCandleStreamWebSocket,
-  createOrderBookStreamWebSocket,
+  // createOrderBookStreamWebSocket,
   fetchBalance,
   fetchCandles,
   fetchOrderBook,
   // fetchPortfolio,
-  filterCandlesByTimeRange,
-  getTimeRangePresets,
 } from "./utils/core";
 
 export default function App() {
@@ -61,17 +58,18 @@ export default function App() {
   const [symbol] = useState("BTCUSDT");
   const [interval] = useState("1m");
 
-  // Time range state
-  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
-    const presets = getTimeRangePresets();
-    return { start: presets["1d"].start, end: presets["1d"].end };
-  });
-  const [timeRangePreset, setTimeRangePreset] = useState<string>("1d");
+  // Time range state - disabled for debugging
+  // const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>(() => {
+  //   const presets = getTimeRangePresets();
+  //   return { start: presets["1d"].start, end: presets["1d"].end };
+  // });
+  // const [timeRangePreset, setTimeRangePreset] = useState<string>("1d");
 
   // WebSocket refs
   const candleWsRef = useRef<WebSocket | null>(null);
   const orderBookWsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
+  const isLoadingDataRef = useRef(false);
 
   // Legacy state for backward compatibility (kept for potential future use)
   // const [sessionData, setSessionData] = useState<LatestSessionResponse | null>(
@@ -80,6 +78,14 @@ export default function App() {
 
   // Load data function using new API endpoints
   const loadData = useCallback(async () => {
+    if (isLoadingDataRef.current) {
+      // console.log("DEBUG: loadData already in progress, skipping");
+      return;
+    }
+
+    // console.log("DEBUG: loadData called");
+    isLoadingDataRef.current = true;
+
     try {
       setLoading(true);
       setError(null);
@@ -92,6 +98,7 @@ export default function App() {
         fetchOrderBook({ symbol, depth: 10 }),
       ]);
 
+      // console.log("DEBUG: Fetched", candlesData.candles.length, "candles");
       setBalance(balanceData);
       // setPortfolio(portfolioData);
       setCandles(candlesData.candles);
@@ -101,6 +108,7 @@ export default function App() {
       console.error("Failed to fetch data:", err);
     } finally {
       setLoading(false);
+      isLoadingDataRef.current = false;
     }
   }, [symbol, interval]);
 
@@ -124,7 +132,7 @@ export default function App() {
       candleWsRef.current = ws;
 
       ws.onopen = () => {
-        console.log("Candle stream WebSocket connected");
+        // console.log("Candle stream WebSocket connected");
         if (isMountedRef.current) {
           setIsCandleStreamConnected(true);
         }
@@ -133,7 +141,7 @@ export default function App() {
       ws.onmessage = (event) => {
         try {
           const apiCandle: ApiCandle = JSON.parse(event.data);
-          console.log("Received candle:", apiCandle);
+          // console.log("Received candle:", apiCandle);
 
           // Update candles state
           setCandles((prev) => {
@@ -163,11 +171,11 @@ export default function App() {
       };
 
       ws.onclose = (event) => {
-        console.log(
-          "Candle stream WebSocket disconnected:",
-          event.code,
-          event.reason
-        );
+        // console.log(
+        //   "Candle stream WebSocket disconnected:",
+        //   event.code,
+        //   event.reason
+        // );
 
         if (isMountedRef.current) {
           setIsCandleStreamConnected(false);
@@ -218,92 +226,92 @@ export default function App() {
       orderBookWsRef.current = null;
     }
 
-    try {
-      const ws = createOrderBookStreamWebSocket();
-      orderBookWsRef.current = ws;
+    // try {
+    //   const ws = createOrderBookStreamWebSocket();
+    //   orderBookWsRef.current = ws;
 
-      ws.onopen = () => {
-        console.log("Order book stream WebSocket connected");
-        if (isMountedRef.current) {
-          setIsOrderBookStreamConnected(true);
-          setError(null); // Clear any previous connection errors
-        }
-      };
+    //   ws.onopen = () => {
+    //     console.log("Order book stream WebSocket connected");
+    //     if (isMountedRef.current) {
+    //       setIsOrderBookStreamConnected(true);
+    //       setError(null); // Clear any previous connection errors
+    //     }
+    //   };
 
-      ws.onmessage = (event) => {
-        try {
-          const orderBookData: OrderBook = JSON.parse(event.data);
-          console.log("Received order book:", orderBookData);
+    //   ws.onmessage = (event) => {
+    //     try {
+    //       const orderBookData: OrderBook = JSON.parse(event.data);
+    //       console.log("Received order book:", orderBookData);
 
-          // Validate order book data structure
-          if (orderBookData && typeof orderBookData === "object") {
-            // Ensure arrays exist and have proper structure
-            const validatedOrderBook: OrderBook = {
-              symbol: orderBookData.symbol || symbol,
-              bids: Array.isArray(orderBookData.bids) ? orderBookData.bids : [],
-              asks: Array.isArray(orderBookData.asks) ? orderBookData.asks : [],
-              timestamp: orderBookData.timestamp || Date.now(),
-            };
-            setOrderBook(validatedOrderBook);
-          }
-        } catch (err) {
-          console.error("Failed to parse order book WebSocket message:", err);
-        }
-      };
+    //       // Validate order book data structure
+    //       if (orderBookData && typeof orderBookData === "object") {
+    //         // Ensure arrays exist and have proper structure
+    //         const validatedOrderBook: OrderBook = {
+    //           symbol: orderBookData.symbol || symbol,
+    //           bids: Array.isArray(orderBookData.bids) ? orderBookData.bids : [],
+    //           asks: Array.isArray(orderBookData.asks) ? orderBookData.asks : [],
+    //           timestamp: orderBookData.timestamp || Date.now(),
+    //         };
+    //         setOrderBook(validatedOrderBook);
+    //       }
+    //     } catch (err) {
+    //       console.error("Failed to parse order book WebSocket message:", err);
+    //     }
+    //   };
 
-      ws.onerror = (error) => {
-        console.error("Order book stream WebSocket error:", error);
-        if (isMountedRef.current) {
-          // Don't set error state immediately, wait for close event
-        }
-      };
+    //   ws.onerror = (error) => {
+    //     console.error("Order book stream WebSocket error:", error);
+    //     if (isMountedRef.current) {
+    //       // Don't set error state immediately, wait for close event
+    //     }
+    //   };
 
-      ws.onclose = (event) => {
-        console.log(
-          "Order book stream WebSocket disconnected:",
-          event.code,
-          event.reason
-        );
+    //   ws.onclose = (event) => {
+    //     console.log(
+    //       "Order book stream WebSocket disconnected:",
+    //       event.code,
+    //       event.reason
+    //     );
 
-        if (isMountedRef.current) {
-          setIsOrderBookStreamConnected(false);
+    //     if (isMountedRef.current) {
+    //       setIsOrderBookStreamConnected(false);
 
-          // Only set error if it's not a clean close
-          if (event.code !== 1000 && event.code !== 1001) {
-            console.warn(
-              "Order book stream disconnected unexpectedly, will retry"
-            );
-          }
-        }
+    //       // Only set error if it's not a clean close
+    //       if (event.code !== 1000 && event.code !== 1001) {
+    //         console.warn(
+    //           "Order book stream disconnected unexpectedly, will retry"
+    //         );
+    //       }
+    //     }
 
-        // Clear the reference if this was the current connection
-        if (orderBookWsRef.current === ws) {
-          orderBookWsRef.current = null;
-        }
+    //     // Clear the reference if this was the current connection
+    //     if (orderBookWsRef.current === ws) {
+    //       orderBookWsRef.current = null;
+    //     }
 
-        // Auto-reconnect if not a manual disconnection and component is mounted
-        if (
-          event.code !== 1000 &&
-          event.code !== 1001 &&
-          isMountedRef.current
-        ) {
-          setTimeout(() => {
-            if (!orderBookWsRef.current && isMountedRef.current) {
-              connectOrderBookStream();
-            }
-          }, 5000); // Longer delay for order book reconnection
-        }
-      };
-    } catch (err) {
-      console.error(
-        "Failed to create order book stream WebSocket connection:",
-        err
-      );
-      if (isMountedRef.current) {
-        setError("Failed to connect to order book stream");
-      }
-    }
-  }, [symbol]);
+    //     // Auto-reconnect if not a manual disconnection and component is mounted
+    //     if (
+    //       event.code !== 1000 &&
+    //       event.code !== 1001 &&
+    //       isMountedRef.current
+    //     ) {
+    //       setTimeout(() => {
+    //         if (!orderBookWsRef.current && isMountedRef.current) {
+    //           connectOrderBookStream();
+    //         }
+    //       }, 5000); // Longer delay for order book reconnection
+    //     }
+    //   };
+    // } catch (err) {
+    //   console.error(
+    //     "Failed to create order book stream WebSocket connection:",
+    //     err
+    //   );
+    //   if (isMountedRef.current) {
+    //     setError("Failed to connect to order book stream");
+    //   }
+    // }
+  }, []);
 
   // Disconnect WebSocket streams
   const disconnectWebSockets = useCallback(() => {
@@ -320,13 +328,18 @@ export default function App() {
   }, []);
 
   // Fetch data on component mount and set up auto-refresh
+  // useEffect(() => {
+  //   loadData();
+
+  //   // Auto-refresh every 30 minutes
+  //   const interval = setInterval(loadData, 30 * 60_000);
+
+  //   return () => clearInterval(interval);
+  // }, [loadData]);
+
   useEffect(() => {
+    console.log("DEBUG: Component mounted, calling loadData");
     loadData();
-
-    // Auto-refresh every 30 minutes
-    const interval = setInterval(loadData, 30 * 60_000);
-
-    return () => clearInterval(interval);
   }, [loadData]);
 
   // Handle WebSocket connections when chart series is ready
@@ -362,18 +375,18 @@ export default function App() {
     [candlestickSeries]
   );
 
-  // Handle time range selection
-  const handleTimeRangeChange = useCallback((preset: string) => {
-    const presets = getTimeRangePresets();
-    const selectedPreset = presets[preset];
-    if (selectedPreset) {
-      setSelectedTimeRange({
-        start: selectedPreset.start,
-        end: selectedPreset.end,
-      });
-      setTimeRangePreset(preset);
-    }
-  }, []);
+  // Handle time range selection - disabled for debugging
+  // const handleTimeRangeChange = useCallback((preset: string) => {
+  //   const presets = getTimeRangePresets();
+  //   const selectedPreset = presets[preset];
+  //   if (selectedPreset) {
+  //     setSelectedTimeRange({
+  //       start: selectedPreset.start,
+  //       end: selectedPreset.end,
+  //     });
+  //     setTimeRangePreset(preset);
+  //   }
+  // }, []);
 
   // Handle custom time range
   // const handleCustomTimeRange = useCallback((start: Date, end: Date) => {
@@ -381,31 +394,20 @@ export default function App() {
   //   setTimeRangePreset("custom");
   // }, []);
 
-  // Convert API candles to chart format and apply time filter
+  // Convert API candles to chart format - NO TIME FILTERING for debugging
   const chartData = useMemo(() => {
     if (candles.length === 0) return undefined;
 
     const convertedCandles = convertApiCandlesToChart(candles);
-    const filteredCandles = filterCandlesByTimeRange(
-      convertedCandles,
-      selectedTimeRange.start,
-      selectedTimeRange.end
-    );
 
-    console.log(
-      `Data filtering: ${candles.length} raw candles → ${convertedCandles.length} converted → ${filteredCandles.length} after time filter (${timeRangePreset})`
-    );
-    console.log(
-      `Time range: ${selectedTimeRange.start.toISOString()} to ${selectedTimeRange.end.toISOString()}`
-    );
+    // console.log(
+    //   `DEBUG: ${candles.length} raw candles → ${convertedCandles.length} converted (NO FILTERING)`
+    // );
+    // console.log("First 3 converted candles:", convertedCandles.slice(0, 3));
+    // console.log("Last 3 converted candles:", convertedCandles.slice(-3));
 
-    return filteredCandles;
-  }, [
-    candles,
-    selectedTimeRange.start,
-    selectedTimeRange.end,
-    timeRangePreset,
-  ]);
+    return convertedCandles;
+  }, [candles]);
 
   // Calculate portfolio value from balance
   const calculatePortfolioValue = (balance: Balance): number => {
@@ -473,21 +475,11 @@ export default function App() {
 
           {/* Center: Timeframe + Chart Tools */}
           <div className="flex-1 flex justify-center items-center space-x-4 h-full py-1">
-            {/* Timeframe Selector */}
+            {/* Static Timeframe Display */}
             <div className="flex items-center space-x-1 h-full">
-              {["1h", "4h", "1d", "All"].map((tf) => (
-                <button
-                  key={tf}
-                  onClick={() => handleTimeRangeChange(tf.toLowerCase())}
-                  className={`px-2 h-full text-xs rounded ${
-                    timeRangePreset === tf.toLowerCase()
-                      ? "bg-neutral-800 text-white"
-                      : "text-neutral-400 hover:text-white hover:bg-neutral-800"
-                  }`}
-                >
-                  {tf}
-                </button>
-              ))}
+              <div className="px-2 h-full text-xs bg-neutral-800 text-white rounded flex items-center">
+                1m (DEBUG: All Data)
+              </div>
             </div>
 
             {/* Chart Type Tools */}
@@ -722,7 +714,7 @@ export default function App() {
               <ErrorBoundary>
                 {error ? (
                   <div className="flex items-center justify-center h-full">
-                    <div className="text-red-400">Error: {error}</div>
+                    <div className="text-rose-400">Error: {error}</div>
                   </div>
                 ) : loading ? (
                   <div className="flex items-center justify-center h-full">
@@ -733,20 +725,20 @@ export default function App() {
                 ) : (
                   <>
                     <ChartComponent
-                      colors={{
-                        backgroundColor: "#000000",
-                        lineColor: "#ffffff",
-                        textColor: "#ffffff",
-                        areaTopColor: "#000000",
-                        areaBottomColor: "#000000",
-                      }}
+                      // colors={{
+                      //   backgroundColor: "#000000",
+                      //   lineColor: "#ffffff",
+                      //   textColor: "#ffffff",
+                      //   areaTopColor: "#000000",
+                      //   areaBottomColor: "#000000",
+                      // }}
                       candleData={chartData}
                       onSeriesReady={handleSeriesReady}
-                      autoFitContent={true}
+                      // autoFitContent={true}
                     />
 
                     {/* Chart Overlay Info */}
-                    <div className="absolute top-4 left-4 z-10 bg-neutral-950 bg-opacity-50 rounded p-2">
+                    {/* <div className="absolute top-4 left-4 z-10 bg-neutral-950 bg-opacity-50 rounded p-2">
                       <div className="text-xs space-y-1">
                         <div className="text-neutral-400">
                           Volume:{" "}
@@ -765,7 +757,7 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                    </div>
+                    </div> */}
                   </>
                 )}
               </ErrorBoundary>
@@ -832,7 +824,7 @@ export default function App() {
                                   key={i}
                                   className="flex justify-between text-xs font-mono hover:bg-neutral-800 p-1 rounded"
                                 >
-                                  <span className="text-red-400">
+                                  <span className="text-rose-400">
                                     {ask.price.toLocaleString(undefined, {
                                       minimumFractionDigits: 2,
                                       maximumFractionDigits: 2,
@@ -912,11 +904,9 @@ export default function App() {
                       {/* Status */}
                       <div className="pt-3 border-t border-neutral-700 text-xs text-neutral-400 text-center">
                         {isOrderBookStreamConnected ? (
-                          <span className="text-emerald-400">
-                            🟢 Live Updates
-                          </span>
+                          <span className="text-emerald-400">Live Updates</span>
                         ) : (
-                          <span className="text-red-400">🔴 Disconnected</span>
+                          <span className="text-rose-400"> Disconnected</span>
                         )}
                       </div>
                     </div>
@@ -932,7 +922,7 @@ export default function App() {
         </div>
 
         {/* Bottom Toolbar like TradingView */}
-        <footer className="bg-neutral-950 h-10 border-t border-neutral-800 flex items-center px-4">
+        <footer className="bg-neutral-950 h-10 border-t border-neutral-800 flex items-center justify-between px-4">
           {/* Left: Status and Stats */}
           <div className="flex items-center space-x-6 text-xs">
             <div className="flex items-center space-x-2">
@@ -989,7 +979,7 @@ export default function App() {
           </div>
 
           {/* Right: Quick Actions */}
-          <div className="flex items-center space-x-2">
+          {/* <div className="flex items-center space-x-2">
             <div className="flex bg-neutral-900 rounded overflow-hidden">
               <button
                 onClick={() => setShowTrading(true)}
@@ -1010,7 +1000,7 @@ export default function App() {
             >
               AI
             </button>
-          </div>
+          </div> */}
         </footer>
       </div>
     </ErrorBoundary>

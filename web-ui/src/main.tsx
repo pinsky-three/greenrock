@@ -5,9 +5,9 @@ import App from "./App.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </StrictMode>
+  // <StrictMode> {/* Disabled temporarily to avoid double API calls in development */}
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+  // </StrictMode>
 );
