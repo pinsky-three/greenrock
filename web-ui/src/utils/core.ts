@@ -2,6 +2,8 @@ import type { Time } from "lightweight-charts";
 import type {
   ApiCandle,
   Balance,
+  BinanceOrderResponse,
+  BinanceTradeResponse,
   Candle,
   CandlesQuery,
   ChatRequest,
@@ -124,6 +126,37 @@ export const getTimeRangePresets = (): TimeRangePresets => {
   return presets;
 };
 
+// Transform Binance API responses to UI format
+export const transformBinanceTradeToUI = (
+  binanceTrade: BinanceTradeResponse,
+  symbol: string
+): Trade => {
+  return {
+    id: binanceTrade.id.toString(),
+    symbol: symbol,
+    side: binanceTrade.isBuyer ? "buy" : "sell",
+    quantity: parseFloat(binanceTrade.qty),
+    price: parseFloat(binanceTrade.price),
+    timestamp: binanceTrade.time,
+    fee: parseFloat(binanceTrade.commission),
+  };
+};
+
+export const transformBinanceOrderToUI = (
+  binanceOrder: BinanceOrderResponse
+): Order => {
+  return {
+    id: binanceOrder.orderId.toString(),
+    symbol: binanceOrder.symbol,
+    side: binanceOrder.side.toLowerCase() as "buy" | "sell",
+    type: binanceOrder.type.toLowerCase() as "market" | "limit",
+    quantity: parseFloat(binanceOrder.origQty),
+    price: binanceOrder.price ? parseFloat(binanceOrder.price) : undefined,
+    status: binanceOrder.status.toLowerCase(),
+    timestamp: binanceOrder.time,
+  };
+};
+
 // API utility functions for new backend routes
 
 // Chat API
@@ -163,22 +196,24 @@ export const fetchBalance = async (): Promise<Balance> => {
 
 export const fetchOpenOrders = async (symbol: string): Promise<Order[]> => {
   const response = await fetch(
-    `http://localhost:4200/broker/open_orders?${symbol}`
+    `http://localhost:4200/broker/open_orders?symbol=${symbol}`
   );
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
-  return response.json();
+  const binanceOrders: BinanceOrderResponse[] = await response.json();
+  return binanceOrders.map(transformBinanceOrderToUI);
 };
 
 export const fetchTradeHistory = async (symbol: string): Promise<Trade[]> => {
   const response = await fetch(
-    `http://localhost:4200/broker/trade_history?${symbol}`
+    `http://localhost:4200/broker/trade_history?symbol=${symbol}`
   );
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
-  return response.json();
+  const binanceTrades: BinanceTradeResponse[] = await response.json();
+  return binanceTrades.map((trade) => transformBinanceTradeToUI(trade, symbol));
 };
 
 export const fetchCandles = async (

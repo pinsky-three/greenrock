@@ -60,7 +60,43 @@ export type OrderBook = {
   timestamp: number;
 };
 
-// Trading types
+// Trading types - API response format
+export type BinanceTradeResponse = {
+  id: number;
+  price: string;
+  qty: string;
+  commission: string;
+  commissionAsset: string;
+  time: number;
+  isBuyer: boolean;
+  isMaker: boolean;
+  isBestMatch: boolean;
+};
+
+export type BinanceOrderResponse = {
+  symbol: string;
+  orderId: number;
+  orderListId: number;
+  clientOrderId: string;
+  price: string;
+  origQty: string;
+  executedQty: string;
+  cummulativeQuoteQty: string;
+  status: string;
+  timeInForce: string;
+  type: string;
+  side: string;
+  stopPrice: string;
+  icebergQty: string;
+  time: number;
+  updateTime: number;
+  isWorking: boolean;
+  workingTime: number;
+  origQuoteOrderQty: string;
+  selfTradePreventionMode: string;
+};
+
+// Trading types - UI format
 export type Order = {
   id: string;
   symbol: string;
