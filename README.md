@@ -2,24 +2,35 @@
 
 **AI-Powered Quantitative Trading & Financial Analysis Platform**
 
-Greenrock is a sophisticated financial technology platform that combines artificial intelligence, advanced quantitative analysis, and real-time trading capabilities. Built with Rust for performance and Python for data science, it provides institutional-grade tools for algorithmic trading, portfolio management, and financial research.
+> ⚠️ **EDUCATIONAL & RESEARCH PURPOSE ONLY**  
+> This platform is designed for educational exploration of quantitative trading concepts and AI-driven financial analysis. **IT IS NOT FINANCIAL ADVICE** and should never be used for actual trading without proper risk management, thorough testing, and professional guidance. Trading financial instruments involves substantial risk of loss.
+
+Greenrock is a sophisticated educational financial technology platform that demonstrates how artificial intelligence, advanced quantitative analysis, and real-time trading capabilities can be integrated. Built with Rust for performance and modern web technologies, it provides a comprehensive learning environment for understanding algorithmic trading, portfolio management, and financial research concepts.
+
+## 🎓 Educational Focus
+
+This platform serves as:
+- **Learning Tool**: Understand quantitative trading strategies and AI integration
+- **Research Environment**: Explore market data analysis and backtesting methodologies
+- **Technology Demonstration**: See how modern systems architecture applies to financial technology
+- **Development Foundation**: A starting point for building your own trading analysis tools
 
 ---
 
-## 🎯 Vision
+## 🎯 Educational Vision
 
-Greenrock empowers traders, quants, and financial institutions with cutting-edge technology to:
-- **Automate complex trading decisions** using AI-driven workflow orchestration
-- **Analyze massive financial datasets** with high-performance data processing
-- **Implement sophisticated trading strategies** with advanced technical indicators
-- **Manage risk intelligently** through AI-assisted portfolio optimization
-- **Research market patterns** using historical data spanning multiple years
+Greenrock provides learners and researchers with modern technology to explore:
+- **AI-driven workflow orchestration** for understanding automated decision-making systems
+- **High-performance data processing** techniques for financial dataset analysis
+- **Advanced technical indicators** and their implementation in trading strategies
+- **Risk management concepts** through AI-assisted portfolio analysis
+- **Market pattern research** using comprehensive historical datasets spanning multiple years
 
 ---
 
 ## ✨ Key Features
 
-### 🤖 **AI-Driven Trading Workflows**
+### 🤖 **AI-Driven Trading Workflows** 
 - **Intelligent Task Orchestration**: Complex multi-step trading workflows with conditional logic
 - **LLM Integration**: Natural language interaction with trading systems via OpenRouter API
 - **Adaptive Decision Making**: AI agents that analyze market conditions and portfolio performance
@@ -43,10 +54,12 @@ Greenrock empowers traders, quants, and financial institutions with cutting-edge
 - **Memory-Efficient Ring Buffers**: Real-time data structures optimized for streaming analytics
 - **Multi-Asset Support**: Cryptocurrency, forex, and traditional market data
 
-### 🎛️ **Enterprise-Grade Architecture**
+### 🎛️ **Production-Grade Architecture**
 - **RESTful API**: HTTP endpoints for chat-based trading interaction and balance queries
+- **Modern Web UI**: React-based interface with real-time charting and trading controls
 - **PostgreSQL Persistence**: Reliable session storage and workflow state management
 - **Concurrent Execution**: Parallel trading engines and web services
+- **Docker Deployment**: Containerized application for easy deployment and scaling
 - **Production-Ready**: Comprehensive error handling, logging, and monitoring
 
 ---
@@ -55,78 +68,116 @@ Greenrock empowers traders, quants, and financial institutions with cutting-edge
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Web API       │    │  AI Workflow    │    │  Trading Engine │
-│   (Chat/REST)   │◄──►│   Orchestrator  │◄──►│   (Real-time)   │
+│   React Web UI  │    │  AI Workflow    │    │  Trading Engine │
+│  (Port 4200)    │◄──►│   Orchestrator  │◄──►│   (Real-time)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          ▼                       ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   PostgreSQL    │    │   Graph Flow    │    │   Binance API   │
-│   (Sessions)    │    │   (Tasks)       │    │   (Market Data) │
+│   REST API      │    │   Graph Flow    │    │   Binance API   │
+│ (Rust/Axum)    │    │   (Tasks)       │    │   (Market Data) │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+         │
+         ▼
+┌─────────────────┐
+│   PostgreSQL    │
+│   (Sessions)    │
+└─────────────────┘
 ```
 
 ### Core Components
 
+- **🌐 React Web Interface**: Modern trading dashboard with real-time charts and controls
 - **🧠 AI Workflow Engine**: Graph-based task orchestration with LLM integration
 - **📈 Trading Strategies**: Modular strategy framework with pluggable algorithms  
-- **🔌 Broker Abstraction**: Unified interface for multiple trading venues
+- **🔌 Broker Abstraction**: Unified interface for multiple trading venues (currently Binance)
 - **📊 Technical Analysis**: High-performance indicator computation library
 - **💾 Data Management**: Efficient time-series data storage and retrieval
+- **🐳 Docker Integration**: Containerized deployment for consistent environments
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
+> ⚠️ **Risk Warning**: This platform is for educational purposes only. Never use with real trading accounts without thorough testing and risk management.
 
-- **Rust** 1.70+ (edition 2024)
-- **Python** 3.12+ (for Jupyter analysis)
-- **PostgreSQL** (for session persistence)
-- **Binance API Keys** (for live trading)
-- **OpenRouter API Key** (for AI features)
+### Option 1: Docker (Recommended)
 
-### Installation
+**Prerequisites:**
+- Docker installed on your system
+- Basic understanding of environment variables
 
-1. **Clone and Setup**:
+**1. Create Environment File:**
 ```bash
-git clone <repository-url>
-cd greenrock
-cargo build --release
-```
-
-2. **Environment Configuration**:
-```bash
-# Create .env file
+# Create .env file with your API keys
 cat > .env << EOF
 DATABASE_URL=postgresql://user:password@localhost/greenrock
-BINANCE_API_KEY=your_binance_api_key
-BINANCE_SECRET_KEY=your_binance_secret_key
-OPENROUTER_API_KEY=your_openrouter_api_key
+BINANCE_API_KEY=your_binance_api_key_here
+BINANCE_SECRET_KEY=your_binance_secret_key_here
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 EOF
 ```
 
-3. **Database Setup**:
+**2. Run with Docker:**
+```bash
+# Pull and run the latest image
+docker run --env-file .env -p 4200:4200 pinsky/greenrock
+```
+
+**3. Access the Platform:**
+- **Web Interface**: `http://localhost:4200`
+- **Health Check**: `http://localhost:4200/health`
+
+### Option 2: Local Development
+
+**Prerequisites:**
+- **Rust** 1.70+ (edition 2021)
+- **Node.js** 20+ and **Bun** (for web UI)
+- **PostgreSQL** (for session persistence)
+- **Binance API Keys** (testnet recommended for learning)
+- **OpenRouter API Key** (for AI features)
+
+**1. Clone and Setup:**
+```bash
+git clone <repository-url>
+cd greenrock
+```
+
+**2. Environment Configuration:**
+```bash
+# Create .env file (same as Docker option above)
+cp .env.example .env
+# Edit .env with your actual API keys
+```
+
+**3. Database Setup:**
 ```bash
 createdb greenrock
-# Run migrations if available
+# Initialize database tables (if migrations exist)
 ```
 
-### Running the Platform
-
-**Start the Full Platform**:
+**4. Build and Run:**
 ```bash
-cargo run
+# Build the Rust engine and web UI
+cargo build --release --package greenrock-engine
+
+# Start the platform
+cargo run --package greenrock-engine
 ```
 
-This launches both:
-- 🌐 **Web API Server** at `http://localhost:8000`
-- 📊 **Real-Time Trading Engine** for BTCUSDT
+**Platform Access:**
+- 🌐 **Web Dashboard**: `http://localhost:4200`
+- 📊 **Real-Time Trading Engine**: Runs automatically for BTCUSDT
+- 🤖 **AI Chat Interface**: Available in the web UI
 
-**Available Endpoints**:
+### Available API Endpoints
+
 - `GET /health` - System health check
 - `POST /chat` - AI-powered trading chat interface
-- `GET /balance` - Account balance and positions
+- `GET /broker/balance` - Account balance and positions
+- `GET /broker/candles` - Historical candlestick data
+- `GET /broker/order_book` - Current order book data
+- `GET /strategy/portfolio` - Portfolio analysis
 
 ---
 
@@ -167,15 +218,25 @@ Access to comprehensive datasets:
 
 ```
 greenrock/
-├── src/
-│   ├── brokers/          # Trading venue integrations
-│   ├── models/           # Data structures and analysis
-│   ├── processor/        # AI workflow tasks
-│   ├── runner/           # Trading execution engine
-│   └── strategy/         # Trading strategy framework
-├── analysis/             # Jupyter notebooks and datasets
-├── processed_btc_data/   # Processed market data
-└── templates/            # AI prompt templates
+├── crates/
+│   └── greenrock-engine/     # Main Rust trading engine
+│       ├── src/
+│       │   ├── brokers/      # Trading venue integrations  
+│       │   ├── models/       # Data structures and analysis
+│       │   ├── processor/    # AI workflow tasks
+│       │   ├── runner/       # Trading execution engine
+│       │   └── strategy/     # Trading strategy framework
+│       └── templates/        # AI prompt templates
+├── greenrock-web-ui/         # React web interface
+│   ├── src/
+│   │   ├── components/       # UI components (Chart, Chat, etc.)
+│   │   ├── types/           # TypeScript type definitions
+│   │   └── utils/           # API utilities and helpers
+│   └── dist/                # Built web assets
+├── analysis/                 # Jupyter notebooks and datasets
+├── processed_btc_data/       # Processed market data
+├── Dockerfile               # Multi-stage Docker build
+└── .env                     # Environment configuration
 ```
 
 ### Adding New Strategies
@@ -226,26 +287,34 @@ let graph = GraphBuilder::new("my_workflow")
 ## 📚 Technology Stack
 
 ### **Core Runtime**
-- **Rust** - High-performance systems programming
+- **Rust** - High-performance systems programming with Cargo workspace
 - **Tokio** - Async runtime for concurrent operations
-- **Axum** - Modern web framework for APIs
+- **Axum** - Modern web framework for REST APIs
+
+### **Frontend & UI**
+- **React 19** - Modern web interface with hooks
+- **TypeScript** - Type-safe frontend development
+- **Vite** - Fast build tool and development server
+- **Tailwind CSS** - Utility-first styling framework
+- **Lightweight Charts** - Professional trading charts
+- **Bun** - Fast JavaScript runtime and package manager
 
 ### **AI & Workflows**
 - **graph-flow** - Workflow orchestration engine  
 - **rig-core** - LLM integration framework
-- **OpenRouter** - Access to multiple AI models
+- **OpenRouter** - Access to multiple AI models (Gemini 2.0 Flash)
 
 ### **Financial Data**
 - **Polars** - High-performance dataframes
 - **ta** - Technical analysis indicators
-- **binance-rs** - Binance API client
-- **Parquet** - Columnar data storage
+- **binance-rs** - Binance API client with WebSocket support
+- **Parquet** - Columnar data storage format
 
-### **Data Science**
-- **Python 3.12+** - Analysis and research
-- **JupyterLab** - Interactive development
-- **nautilus-trader** - Institutional trading framework
-- **ccxt** - Multi-exchange connectivity
+### **DevOps & Deployment**
+- **Docker** - Multi-stage containerization
+- **PostgreSQL** - Production database
+- **WebSocket** - Real-time data streaming
+- **CORS** - Cross-origin resource sharing
 
 ---
 
@@ -256,9 +325,9 @@ let graph = GraphBuilder::new("my_workflow")
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | ✅ |
-| `BINANCE_API_KEY` | Binance API key | ✅ |
-| `BINANCE_SECRET_KEY` | Binance secret key | ✅ |
-| `OPENROUTER_API_KEY` | OpenRouter API key for AI | ✅ |
+| `BINANCE_API_KEY` | Binance API key |  |
+| `BINANCE_SECRET_KEY` | Binance secret key | |
+| `OPENROUTER_API_KEY` | OpenRouter API key for AI |  |
 
 ### Trading Configuration
 
@@ -266,6 +335,12 @@ let graph = GraphBuilder::new("my_workflow")
 - Technical indicator periods (MACD: 12,26,9 | EMA: 20 | SuperTrend: 10,3.0)
 - Risk management settings (position size, stop-loss levels)
 - Execution intervals and timeframes
+
+**Web Interface Configuration**:
+- Frontend served on port 4200
+- Real-time WebSocket connections for live data
+- Auto-reconnection for market data streams
+- Modern dark theme with professional trading colors [[memory:6996567]]
 
 **AI Model Settings**:
 - Default model: `google/gemini-2.0-flash-001`
@@ -309,9 +384,11 @@ We welcome contributions from the quantitative finance and AI community!
 ### Areas for Contribution
 - 📊 **New technical indicators** and analysis methods
 - 🤖 **Additional AI workflow tasks** and decision logic  
-- 🏦 **Multi-venue broker integrations** (FTX, Coinbase, etc.)
+- 🏦 **Multi-venue broker integrations** (Coinbase, Kraken, etc.)
 - 📈 **Advanced trading strategies** and risk management
 - 🔬 **Research tools** and backtesting frameworks
+- 🌐 **Web UI enhancements** and new dashboard features
+- 🐳 **DevOps improvements** and deployment automation
 
 ---
 
@@ -339,4 +416,24 @@ Greenrock builds upon the excellent work of:
 
 ---
 
-*🚀 Built with ❤️ for the future of quantitative finance*
+## ⚠️ Disclaimer
+
+**EDUCATIONAL PURPOSE ONLY**: Greenrock is designed as an educational platform to demonstrate modern financial technology concepts and AI integration. This software:
+
+- **IS NOT FINANCIAL ADVICE**: Never use this platform for actual trading decisions
+- **IS NOT INVESTMENT ADVICE**: All strategies and analysis are for learning purposes only
+- **CARRIES SIGNIFICANT RISK**: Real trading involves substantial risk of financial loss
+- **REQUIRES EXPERTISE**: Professional trading requires extensive knowledge and experience
+
+**Before Any Real Trading:**
+- Thoroughly test all strategies with paper trading
+- Understand risk management principles
+- Consult with qualified financial professionals
+- Never risk more than you can afford to lose
+- Ensure compliance with local financial regulations
+
+**The developers and contributors assume no responsibility for any financial losses incurred through the use of this software.**
+
+---
+
+*🎓 Built with ❤️ for financial technology education and research*
