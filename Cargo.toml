@@ -3,6 +3,6 @@ resolver = "3"
 members = ["crates/greenrock-engine"]
 
 [workspace.package]
-name = "greenrock"
+# name = "greenrock"
 version = "0.1.0"
 edition = "2021"
