@@ -1,4 +1,23 @@
-# React + TypeScript + Vite
+# Greenrock Web UI
+
+A React + TypeScript + Vite application for the Greenrock trading platform UI.
+
+## Configuration
+
+### Environment Variables
+
+The application supports configuration via environment variables:
+
+- `VITE_API_BASE`: Base URL for the Greenrock API backend
+  - Default: Uses same-origin with port 4200 (e.g., `http://localhost:4200`)
+  - Production: Set to your API server URL (e.g., `https://api.greenrock.example.com`)
+
+Create a `.env.local` file for local development:
+```bash
+VITE_API_BASE=http://localhost:4200
+```
+
+### Development Setup
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

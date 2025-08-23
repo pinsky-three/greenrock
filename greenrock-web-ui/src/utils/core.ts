@@ -17,6 +17,43 @@ import type {
   Trade,
 } from "../types/core";
 
+// API base URL configuration
+// Supports environment override via VITE_API_BASE or defaults to same-origin
+const getApiBase = (): string => {
+  // Check for environment variable (Vite uses VITE_ prefix)
+  if (import.meta.env?.VITE_API_BASE) {
+    return import.meta.env.VITE_API_BASE as string;
+  }
+
+  // Fallback to same-origin with port 4200 for development
+  // In production, this should be overridden via environment variable
+  if (typeof window !== "undefined") {
+    const { protocol, hostname } = window.location;
+    return `${protocol}//${hostname}`;
+  }
+
+  // SSR fallback
+  return "http://localhost:4200";
+};
+
+const API_BASE = getApiBase();
+
+// Helper to create API URLs with proper encoding
+const createApiUrl = (path: string, params?: URLSearchParams): string => {
+  const url = new URL(path, API_BASE);
+  if (params) {
+    url.search = params.toString();
+  }
+  return url.toString();
+};
+
+// Helper to create WebSocket URLs (converts http/https to ws/wss)
+const createWebSocketUrl = (path: string): string => {
+  const url = new URL(path, API_BASE);
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
+};
+
 // Convert API candles to chart format
 export const convertApiCandlesToChart = (apiCandles: ApiCandle[]): Candle[] => {
   // console.log("Converting candles:", apiCandles.length, "samples:");
@@ -163,7 +200,8 @@ export const transformBinanceOrderToUI = (
 export const sendChatMessage = async (
   request: ChatRequest
 ): Promise<ChatResponse | PauseResponse> => {
-  const response = await fetch("http://localhost:4200/chat", {
+  const url = createApiUrl("/chat");
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -178,7 +216,8 @@ export const sendChatMessage = async (
 
 // Strategy API
 export const fetchPortfolio = async (): Promise<Portfolio> => {
-  const response = await fetch("http://localhost:4200/strategy/portfolio");
+  const url = createApiUrl("/strategy/portfolio");
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -187,7 +226,8 @@ export const fetchPortfolio = async (): Promise<Portfolio> => {
 
 // Broker API
 export const fetchBalance = async (): Promise<Balance> => {
-  const response = await fetch("http://localhost:4200/broker/balance");
+  const url = createApiUrl("/broker/balance");
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -195,9 +235,9 @@ export const fetchBalance = async (): Promise<Balance> => {
 };
 
 export const fetchOpenOrders = async (symbol: string): Promise<Order[]> => {
-  const response = await fetch(
-    `http://localhost:4200/broker/open_orders?symbol=${symbol}`
-  );
+  const params = new URLSearchParams({ symbol });
+  const url = createApiUrl("/broker/open_orders", params);
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -206,9 +246,9 @@ export const fetchOpenOrders = async (symbol: string): Promise<Order[]> => {
 };
 
 export const fetchTradeHistory = async (symbol: string): Promise<Trade[]> => {
-  const response = await fetch(
-    `http://localhost:4200/broker/trade_history?symbol=${symbol}`
-  );
+  const params = new URLSearchParams({ symbol });
+  const url = createApiUrl("/broker/trade_history", params);
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -231,9 +271,8 @@ export const fetchCandles = async (
     params.append("end", query.end);
   }
 
-  const response = await fetch(
-    `http://localhost:4200/broker/candles?${params}`
-  );
+  const url = createApiUrl("/broker/candles", params);
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -248,9 +287,8 @@ export const fetchOrderBook = async (
     depth: query.depth.toString(),
   });
 
-  const response = await fetch(
-    `http://localhost:4200/broker/order_book?${params}`
-  );
+  const url = createApiUrl("/broker/order_book", params);
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -259,11 +297,13 @@ export const fetchOrderBook = async (
 
 // WebSocket connection utilities
 export const createCandleStreamWebSocket = (): WebSocket => {
-  return new WebSocket("ws://localhost:4200/broker/candle_stream");
+  const url = createWebSocketUrl("/broker/candle_stream");
+  return new WebSocket(url);
 };
 
 export const createOrderBookStreamWebSocket = (): WebSocket => {
-  return new WebSocket("ws://localhost:4200/broker/order_book_stream");
+  const url = createWebSocketUrl("/broker/order_book_stream");
+  return new WebSocket(url);
 };
 
 // // Legacy function for backward compatibility
