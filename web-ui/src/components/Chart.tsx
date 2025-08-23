@@ -1,8 +1,8 @@
 import {
-  // AreaSeries,
   createChart,
   ColorType,
   CandlestickSeries,
+  LineSeries,
 } from "lightweight-charts";
 import type { ISeriesApi, IChartApi } from "lightweight-charts";
 import { useEffect, useRef } from "react";
@@ -26,8 +26,57 @@ export const ChartComponent = (props: {
 
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const ma20SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ma50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ma200SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const isInitialLoadRef = useRef(true);
   const previousDataLengthRef = useRef(0);
+
+  // Function to calculate moving average
+  const calculateMovingAverage = (candleData: Candle[], period: number) => {
+    const maData = [];
+
+    for (let i = 0; i < candleData.length; i++) {
+      if (i < period - 1) {
+        // Provide whitespace data points until the MA can be calculated
+        maData.push({ time: candleData[i].time });
+      } else {
+        // Calculate the moving average
+        let sum = 0;
+        for (let j = 0; j < period; j++) {
+          sum += candleData[i - j].close;
+        }
+        const maValue = sum / period;
+        maData.push({ time: candleData[i].time, value: maValue });
+      }
+    }
+
+    return maData;
+  };
+
+  // Function to update moving averages for real-time updates
+  const updateMovingAverages = (candleData: Candle[], index: number) => {
+    const updateMA = (
+      period: number,
+      seriesRef: React.MutableRefObject<ISeriesApi<"Line"> | null>
+    ) => {
+      if (index >= period - 1 && seriesRef.current) {
+        let sum = 0;
+        for (let j = 0; j < period; j++) {
+          sum += candleData[index - j].close;
+        }
+        const maValue = sum / period;
+        seriesRef.current.update({
+          time: candleData[index].time,
+          value: maValue,
+        });
+      }
+    };
+
+    updateMA(20, ma20SeriesRef);
+    updateMA(50, ma50SeriesRef);
+    updateMA(200, ma200SeriesRef);
+  };
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -85,8 +134,30 @@ export const ChartComponent = (props: {
         wickDownColor: "#ff1e38",
       });
 
+      // Add moving average series
+      const ma20Series = chart.addSeries(LineSeries, {
+        color: "#2962FF", // Blue
+        lineWidth: 1,
+        title: "MA 20",
+      });
+
+      const ma50Series = chart.addSeries(LineSeries, {
+        color: "#FF6D00", // Orange
+        lineWidth: 1,
+        title: "MA 50",
+      });
+
+      const ma200Series = chart.addSeries(LineSeries, {
+        color: "#E91E63", // Pink
+        lineWidth: 1,
+        title: "MA 200",
+      });
+
       chartRef.current = chart;
       seriesRef.current = series;
+      ma20SeriesRef.current = ma20Series;
+      ma50SeriesRef.current = ma50Series;
+      ma200SeriesRef.current = ma200Series;
 
       // Notify parent component that series is ready for real-time updates
       if (onSeriesReady) {
@@ -126,6 +197,16 @@ export const ChartComponent = (props: {
         // console.log("Chart: First candle:", candleData[0]);
         // console.log("Chart: Last candle:", candleData[candleData.length - 1]);
         seriesRef.current.setData(candleData);
+
+        // Calculate and set moving average data
+        const ma20Data = calculateMovingAverage(candleData, 20);
+        const ma50Data = calculateMovingAverage(candleData, 50);
+        const ma200Data = calculateMovingAverage(candleData, 200);
+
+        if (ma20SeriesRef.current) ma20SeriesRef.current.setData(ma20Data);
+        if (ma50SeriesRef.current) ma50SeriesRef.current.setData(ma50Data);
+        if (ma200SeriesRef.current) ma200SeriesRef.current.setData(ma200Data);
+
         previousDataLengthRef.current = currentDataLength;
         isInitialLoadRef.current = false;
         // Set initial position to show recent data, but allow full zoom out
@@ -137,22 +218,39 @@ export const ChartComponent = (props: {
         }
       } else if (currentDataLength > previousDataLength) {
         // New data added - use update for the latest candle
-        console.log("New candle added, updating latest");
+        // console.log("New candle added, updating latest");
         const latestCandle = candleData[candleData.length - 1];
         seriesRef.current.update(latestCandle);
+
+        // Update moving averages for new data
+        updateMovingAverages(candleData, currentDataLength - 1);
+
         previousDataLengthRef.current = currentDataLength;
       } else if (
         currentDataLength === previousDataLength &&
         previousDataLength > 0
       ) {
         // Same length, but data might have changed (e.g., last candle updated)
-        console.log("Updating existing candle");
+        // console.log("Updating existing candle");
         const latestCandle = candleData[candleData.length - 1];
         seriesRef.current.update(latestCandle);
+
+        // Update moving averages for modified data
+        updateMovingAverages(candleData, currentDataLength - 1);
       } else {
         // Data length changed significantly - full reset needed
-        console.log("Full reset: setting", currentDataLength, "candles");
+        // console.log("Full reset: setting", currentDataLength, "candles");
         seriesRef.current.setData(candleData);
+
+        // Recalculate and set all moving average data
+        const ma20Data = calculateMovingAverage(candleData, 20);
+        const ma50Data = calculateMovingAverage(candleData, 50);
+        const ma200Data = calculateMovingAverage(candleData, 200);
+
+        if (ma20SeriesRef.current) ma20SeriesRef.current.setData(ma20Data);
+        if (ma50SeriesRef.current) ma50SeriesRef.current.setData(ma50Data);
+        if (ma200SeriesRef.current) ma200SeriesRef.current.setData(ma200Data);
+
         previousDataLengthRef.current = currentDataLength;
       }
     }
@@ -165,6 +263,9 @@ export const ChartComponent = (props: {
         chartRef.current.remove();
         chartRef.current = null;
         seriesRef.current = null;
+        ma20SeriesRef.current = null;
+        ma50SeriesRef.current = null;
+        ma200SeriesRef.current = null;
       }
     };
   }, []);
