@@ -4,7 +4,7 @@ import {
   ColorType,
   CandlestickSeries,
 } from "lightweight-charts";
-import type { ISeriesApi, IChartApi, Time } from "lightweight-charts";
+import type { ISeriesApi, IChartApi } from "lightweight-charts";
 import { useEffect, useRef } from "react";
 import type { Candle } from "../types/core";
 
@@ -64,9 +64,9 @@ export const ChartComponent = (props: {
         timeScale: {
           borderColor: "#333333",
           timeVisible: true,
-          barSpacing: 50, // Much larger spacing to see individual candles
-          minBarSpacing: 20,
-          rightOffset: 100,
+          // barSpacing: 20, // Good default spacing
+          // minBarSpacing: 1, // Allow zooming out much more
+          // rightOffset: 20,
           fixLeftEdge: false,
           fixRightEdge: false,
         },
@@ -98,8 +98,8 @@ export const ChartComponent = (props: {
       //   "DEBUG: Chart created, applying LARGE spacing for 500 candles in 8 hours"
       // );
       chart.timeScale().applyOptions({
-        barSpacing: 50,
-        rightOffset: 100,
+        barSpacing: 10,
+        rightOffset: 5,
       });
     }
 
@@ -128,22 +128,12 @@ export const ChartComponent = (props: {
         seriesRef.current.setData(candleData);
         previousDataLengthRef.current = currentDataLength;
         isInitialLoadRef.current = false;
-        // Explicitly set visible time range to show last 200 candles on load
+        // Set initial position to show recent data, but allow full zoom out
         if (chartRef.current) {
-          const lastIndex = candleData.length - 1;
-          const startIndex = Math.max(0, lastIndex - 200);
-          const fromTime = candleData[startIndex].time as Time;
-          const toTime = candleData[lastIndex].time as Time;
-          // console.log(
-          //   "Chart: setVisibleRange from",
-          //   fromTime,
-          //   "to",
-          //   toTime,
-          //   `(showing ${lastIndex - startIndex + 1} candles)`
-          // );
-          chartRef.current
-            .timeScale()
-            .setVisibleRange({ from: fromTime, to: toTime });
+          // Position to show recent data but don't restrict zoom limits
+          chartRef.current.timeScale().scrollToPosition(5, true);
+          // chartRef.current.timeScale().
+          // chartRef.current.timeScale().scrollToRealTime();
         }
       } else if (currentDataLength > previousDataLength) {
         // New data added - use update for the latest candle

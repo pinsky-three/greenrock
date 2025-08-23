@@ -478,7 +478,7 @@ export default function App() {
             {/* Static Timeframe Display */}
             <div className="flex items-center space-x-1 h-full">
               <div className="px-2 h-full text-xs bg-neutral-800 text-white rounded flex items-center">
-                1m (DEBUG: All Data)
+                1m
               </div>
             </div>
 
