@@ -7,6 +7,15 @@
 
 Greenrock is a sophisticated educational financial technology platform that demonstrates how artificial intelligence, advanced quantitative analysis, and real-time trading capabilities can be integrated. Built with Rust for performance and modern web technologies, it provides a comprehensive learning environment for understanding algorithmic trading, portfolio management, and financial research concepts.
 
+
+<div align="center">
+  <img src="artifacts/greenrock_v0.1.0_screenshot_1.png" alt="Greenrock Trading Platform Interface" width="100%" style="border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+  
+  *Modern web interface featuring real-time charts, AI-powered chat assistant, and comprehensive trading controls*
+</div>
+
+---
+
 ## 🎓 Educational Focus
 
 This platform serves as:
