@@ -167,7 +167,13 @@ createdb greenrock
 
 **4. Build and Run:**
 ```bash
-# Build the Rust engine and web UI
+# Build web UI
+cd greenrock-web-ui
+bun install
+bun run build
+cd ..
+
+# Build the Rust engine
 cargo build --release --package greenrock-engine
 
 # Start the platform
