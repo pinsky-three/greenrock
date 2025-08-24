@@ -492,7 +492,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/broker/candle_stream", get(get_candle_stream))
         .route("/broker/order_book", get(get_order_book))
         .route("/broker/order_book_stream", get(get_order_book_stream))
-        .fallback_service(get_service(ServeDir::new("web-ui/dist")))
+        .fallback_service(get_service(ServeDir::new("greenrock-web-ui/dist")))
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
 

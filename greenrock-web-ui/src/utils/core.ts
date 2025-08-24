@@ -28,7 +28,10 @@ const getApiBase = (): string => {
   // Fallback to same-origin with port 4200 for development
   // In production, this should be overridden via environment variable
   if (typeof window !== "undefined") {
-    const { protocol, hostname } = window.location;
+    const { protocol, hostname, port } = window.location;
+    if (port) {
+      return `${protocol}//${hostname}:${port}`;
+    }
     return `${protocol}//${hostname}`;
   }
 

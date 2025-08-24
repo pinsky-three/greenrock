@@ -433,7 +433,3 @@ Greenrock builds upon the excellent work of:
 - Ensure compliance with local financial regulations
 
 **The developers and contributors assume no responsibility for any financial losses incurred through the use of this software.**
-
----
-
-*🎓 Built with ❤️ for financial technology education and research*
