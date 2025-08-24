@@ -43,14 +43,16 @@ export function TradingControls({ symbol, onClose }: TradingControlsProps) {
   return (
     <div className="flex flex-col h-full bg-black text-white">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-neutral-800">
-        <div className="flex items-center space-x-3">
-          <h2 className="text-lg font-medium">Trading Dashboard</h2>
-          <span className="text-xs text-neutral-400 bg-neutral-900 px-2 py-1 rounded">
+      <div className="flex items-center justify-between p-3 md:p-4 border-b border-neutral-800">
+        <div className="flex items-center space-x-2 md:space-x-3">
+          <h2 className="text-base md:text-lg font-medium">
+            Trading Dashboard
+          </h2>
+          <span className="hidden sm:inline text-xs text-neutral-400 bg-neutral-900 px-2 py-1 rounded">
             {symbol}
           </span>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 md:space-x-2">
           <button
             onClick={loadData}
             disabled={loading}
@@ -92,7 +94,7 @@ export function TradingControls({ symbol, onClose }: TradingControlsProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4">
         {error ? (
           <div className="text-rose-400 text-center p-4">
             <div className="text-2xl mb-2">⚠️</div>
@@ -145,7 +147,7 @@ export function TradingControls({ symbol, onClose }: TradingControlsProps) {
                       {order.status.toUpperCase()}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm">
                     <div>
                       <span className="text-neutral-400">Quantity: </span>
                       <span className="text-white font-mono">
@@ -201,7 +203,7 @@ export function TradingControls({ symbol, onClose }: TradingControlsProps) {
                       ${(trade.price * trade.quantity).toFixed(2)}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm">
                     <div>
                       <span className="text-neutral-400">Quantity: </span>
                       <span className="text-white font-mono">
@@ -233,8 +235,8 @@ export function TradingControls({ symbol, onClose }: TradingControlsProps) {
       </div>
 
       {/* Quick Actions */}
-      <div className="p-4 border-t border-neutral-800">
-        <div className="flex space-x-2">
+      <div className="p-3 md:p-4 border-t border-neutral-800">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
           <button className="flex-1 bg-emerald-600 hover:bg-emerald-700 py-3 rounded text-sm font-medium transition-colors">
             Place Buy Order
           </button>

@@ -20,7 +20,19 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkIsMobile();
+    window.addEventListener("resize", checkIsMobile);
+
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -115,16 +127,16 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
   return (
     <div className="flex flex-col h-full bg-neutral-900 text-white">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700">
-        <div className="flex items-center space-x-3">
-          <h2 className="text-lg font-medium">Greenrock Agent</h2>
+      <div className="flex items-center justify-between p-3 md:p-4 border-b border-gray-700">
+        <div className="flex items-center space-x-2 md:space-x-3">
+          <h2 className="text-base md:text-lg font-medium">Greenrock Agent</h2>
           {currentSessionId && (
-            <span className="text-xs text-neutral-400 bg-neutral-800 px-2 py-1 rounded">
+            <span className="hidden sm:inline text-xs text-neutral-400 bg-neutral-800 px-2 py-1 rounded">
               Session: {currentSessionId.slice(0, 8)}...
             </span>
           )}
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 md:space-x-2">
           <button
             onClick={clearChat}
             className="text-xs bg-neutral-700 hover:bg-neutral-600 px-2 py-1 rounded"
@@ -141,12 +153,14 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 md:space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center text-neutral-500 mt-8">
-            <div className="text-2xl mb-2">🤖</div>
-            <p>Start a conversation with the AI assistant</p>
-            <p className="text-sm mt-1">
+          <div className="text-center text-neutral-500 mt-6 md:mt-8">
+            <div className="text-xl md:text-2xl mb-2">🤖</div>
+            <p className="text-sm md:text-base">
+              Start a conversation with the AI assistant
+            </p>
+            <p className="text-xs md:text-sm mt-1">
               Ask about trading strategies, market analysis, or portfolio
               management
             </p>
@@ -160,7 +174,7 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
               }`}
             >
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                className={`max-w-[85%] sm:max-w-xs lg:max-w-md px-3 md:px-4 py-2 rounded-lg ${
                   message.role === "user"
                     ? "bg-blue-600 text-white"
                     : message.status === "error"
@@ -170,7 +184,7 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
                     : "bg-neutral-700 text-white"
                 }`}
               >
-                <div className="text-sm whitespace-pre-wrap">
+                <div className="text-xs md:text-sm whitespace-pre-wrap">
                   {message.content}
                 </div>
                 <div className="text-xs opacity-75 mt-1">
@@ -207,27 +221,27 @@ export function ChatComponent({ onClose }: ChatComponentProps) {
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-700">
+      <div className="p-3 md:p-4 border-t border-gray-700">
         <div className="flex space-x-2">
           <textarea
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask about trading strategies, market analysis, or portfolio management..."
-            className="flex-1 bg-neutral-800 text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none resize-none"
-            rows={2}
+            className="flex-1 bg-neutral-800 text-white px-3 py-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none resize-none text-sm md:text-base"
+            rows={isMobile ? 1 : 2}
             disabled={isLoading}
           />
           <button
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-600 px-4 py-2 rounded-lg font-medium"
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-neutral-600 px-3 md:px-4 py-2 rounded-lg font-medium text-sm md:text-base"
           >
             Send
           </button>
         </div>
         <div className="text-xs text-neutral-500 mt-2">
-          Press Enter to send, Shift+Enter for new line
+          Press Enter to send{!isMobile ? ", Shift+Enter for new line" : ""}
         </div>
       </div>
     </div>

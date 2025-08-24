@@ -13,16 +13,15 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 // Import react-icons
 import {
   IoSearch,
-  IoEllipsisVertical,
   IoTrendingUp,
-  IoNotifications,
   IoSettings,
   IoRefresh,
   IoChatbubble,
   IoBarChart,
   IoWallet,
+  IoClose,
 } from "react-icons/io5";
-import { RiFullscreenLine, RiBarChartLine } from "react-icons/ri";
+import { RiBarChartLine } from "react-icons/ri";
 import { TbChartCandle, TbChartLine, TbChartArea } from "react-icons/tb";
 import {
   convertApiCandlesToChart,
@@ -49,8 +48,12 @@ export default function App() {
     useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showTrading, setShowTrading] = useState(false);
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(() => {
+    return typeof window !== "undefined" && window.innerWidth < 768;
+  });
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(() => {
+    return typeof window !== "undefined" && window.innerWidth < 768;
+  });
   const [candlestickSeries, setCandlestickSeries] =
     useState<ISeriesApi<"Candlestick"> | null>(null);
 
@@ -432,34 +435,25 @@ export default function App() {
         {/* TradingView Style Header */}
         <header className="bg-neutral-950 h-12 border-b border-neutral-800 flex items-center px-3">
           {/* Left: Logo + Symbol Search */}
-          <div className="flex items-center space-x-3">
-            {/* Logo placeholder */}
-            {/* <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center text-black font-bold ">
-              G
-            </div> */}
+          <div className="flex items-center space-x-2 md:space-x-3">
             <img
               src="/greenrock_logo.svg"
               alt="Greenrock"
-              className="w-6 h-6"
+              className="w-5 h-5 md:w-6 md:h-6"
             />
 
             {/* Symbol Search */}
-            <div className="flex items-center bg-neutral-950 rounded border-0 hover:border-neutral-600 px-3 py-1.5">
-              <IoSearch className="text-neutral-400 mr-2" size={16} />
-              <span className="text-white font-medium">{symbol}</span>
-              {/* <span className="text-yellow-400 ml-2 text-xs font-medium">
-                BINANCE
-              </span> */}
-              {/* <span className="text-neutral-500 mx-1">•</span>
-              <span className="text-neutral-400 text-xs">1</span>
-              <span className="text-neutral-500 mx-1">•</span>
-              <span className="text-neutral-400 text-xs uppercase">Crypto</span> */}
+            <div className="flex items-center bg-neutral-950 rounded border-0 hover:border-neutral-600 px-2 md:px-3 py-1.5">
+              <IoSearch className="text-neutral-400 mr-1 md:mr-2" size={14} />
+              <span className="text-white font-medium text-sm md:text-base">
+                {symbol}
+              </span>
             </div>
 
-            {/* Price Info */}
+            {/* Price Info - Hidden on small mobile */}
             {candles.length > 0 && (
-              <div className="flex items-center space-x-3 ml-4">
-                <div className="text-white font-medium text-lg">
+              <div className="hidden sm:flex items-center space-x-2 md:space-x-3 ml-2 md:ml-4">
+                <div className="text-white font-medium text-sm md:text-lg">
                   {candles[candles.length - 1]?.close?.toLocaleString(
                     undefined,
                     {
@@ -468,18 +462,15 @@ export default function App() {
                     }
                   )}
                 </div>
-                <div className="text-emerald-400 text-sm font-medium">
+                <div className="text-emerald-400 text-xs md:text-sm font-medium">
                   +649.90 (+0.45%)
                 </div>
-                {/* <div className="text-neutral-400 text-xs">
-                  H: 113,300.00 L: 113,293.80 C: 113,293.80
-                </div> */}
               </div>
             )}
           </div>
 
           {/* Center: Timeframe + Chart Tools */}
-          <div className="flex-1 flex justify-center items-center space-x-4 h-full py-1">
+          <div className="hidden md:flex flex-1 justify-center items-center space-x-3 lg:space-x-4 h-full py-1">
             {/* Static Timeframe Display */}
             <div className="flex items-center space-x-1 h-full">
               <div className="px-2 h-full text-xs bg-neutral-800 text-white rounded flex items-center">
@@ -488,29 +479,29 @@ export default function App() {
             </div>
 
             {/* Chart Type Tools */}
-            <div className="flex items-center space-x-1 border-l border-neutral-700 pl-4">
+            <div className="flex items-center space-x-1 border-l border-neutral-700 pl-3 lg:pl-4">
               <button
                 className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
                 title="Candles"
               >
-                <TbChartCandle size={16} />
+                <TbChartCandle size={14} />
               </button>
               <button
                 className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
                 title="Line"
               >
-                <TbChartLine size={16} />
+                <TbChartLine size={14} />
               </button>
               <button
                 className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
                 title="Area"
               >
-                <TbChartArea size={16} />
+                <TbChartArea size={14} />
               </button>
             </div>
 
             {/* Indicators */}
-            <div className="flex items-center space-x-1 border-l border-neutral-700 pl-4">
+            <div className="hidden lg:flex items-center space-x-1 border-l border-neutral-700 pl-4">
               <button className="px-2 py-1 text-xs text-neutral-400 hover:text-white hover:bg-neutral-800 rounded">
                 <IoTrendingUp className="inline mr-1" size={14} />
                 Indicators
@@ -520,35 +511,7 @@ export default function App() {
 
           {/* Right: Tools and Settings */}
           <div className="flex items-center space-x-1">
-            {/* Layout Controls */}
-            <button
-              onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
-              className={`p-1.5 rounded ${
-                leftSidebarCollapsed
-                  ? "text-neutral-400 hover:text-white hover:bg-neutral-800"
-                  : "text-blue-400 bg-neutral-800"
-              }`}
-              title="Watchlist"
-            >
-              <IoWallet size={16} />
-            </button>
-
-            <button
-              onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
-              className={`p-1.5 rounded ${
-                rightSidebarCollapsed
-                  ? "text-neutral-400 hover:text-white hover:bg-neutral-800"
-                  : "text-blue-400 bg-neutral-800"
-              }`}
-              title="Order Book"
-            >
-              <RiBarChartLine size={16} />
-            </button>
-
-            {/* Divider */}
-            <div className="h-6 w-px bg-neutral-700 mx-2"></div>
-
-            {/* Action Tools */}
+            {/* Essential Mobile Controls */}
             <button
               onClick={() => setShowChat(!showChat)}
               className={`p-1.5 rounded ${
@@ -558,7 +521,7 @@ export default function App() {
               }`}
               title="AI Assistant"
             >
-              <IoChatbubble size={16} />
+              <IoChatbubble size={14} />
             </button>
 
             <button
@@ -570,11 +533,36 @@ export default function App() {
               }`}
               title="Trading Panel"
             >
-              <IoBarChart size={16} />
+              <IoBarChart size={14} />
             </button>
 
-            {/* Status */}
-            <div className="flex items-center space-x-1 mx-2">
+            {/* Desktop Layout Controls */}
+            <button
+              onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
+              className={`hidden md:flex p-1.5 rounded ${
+                leftSidebarCollapsed
+                  ? "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                  : "text-blue-400 bg-neutral-800"
+              }`}
+              title="Portfolio"
+            >
+              <IoWallet size={14} />
+            </button>
+
+            <button
+              onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
+              className={`hidden md:flex p-1.5 rounded ${
+                rightSidebarCollapsed
+                  ? "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                  : "text-blue-400 bg-neutral-800"
+              }`}
+              title="Order Book"
+            >
+              <RiBarChartLine size={14} />
+            </button>
+
+            {/* Status - Hidden on small mobile */}
+            <div className="hidden sm:flex items-center space-x-1 mx-1 lg:mx-2">
               <div
                 className={`w-2 h-2 rounded-full ${
                   isConnected ? "bg-green-400" : "bg-red-400"
@@ -585,51 +573,79 @@ export default function App() {
               </span>
             </div>
 
-            {/* More Tools */}
-            <button
-              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
-              title="Alerts"
-            >
-              <IoNotifications size={16} />
-            </button>
-
+            {/* Secondary Tools - Hidden on small screens */}
             <button
               onClick={loadData}
               disabled={loading}
-              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded disabled:opacity-50"
+              className="hidden lg:flex p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded disabled:opacity-50"
               title="Refresh"
             >
-              <IoRefresh size={16} />
+              <IoRefresh size={14} />
             </button>
 
             <button
-              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
-              title="Fullscreen"
-            >
-              <RiFullscreenLine size={16} />
-            </button>
-
-            <button
-              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
+              className="hidden lg:flex p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
               title="Settings"
             >
-              <IoSettings size={16} />
+              <IoSettings size={14} />
+            </button>
+
+            {/* Mobile Sidebar Toggles */}
+            <button
+              onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
+              className={`md:hidden p-1.5 rounded ${
+                leftSidebarCollapsed
+                  ? "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                  : "text-blue-400 bg-neutral-800"
+              }`}
+              title="Portfolio"
+            >
+              <IoWallet size={14} />
             </button>
 
             <button
-              className="p-1.5 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
-              title="More"
+              onClick={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
+              className={`md:hidden p-1.5 rounded ${
+                rightSidebarCollapsed
+                  ? "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                  : "text-blue-400 bg-neutral-800"
+              }`}
+              title="Order Book"
             >
-              <IoEllipsisVertical size={16} />
+              <RiBarChartLine size={14} />
             </button>
           </div>
         </header>
 
         {/* Main Content Area */}
         <div className="flex-1 flex relative">
+          {/* Mobile Backdrop */}
+          {!showChat && !showTrading && !leftSidebarCollapsed && (
+            <div
+              className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-20"
+              onClick={() => setLeftSidebarCollapsed(true)}
+            />
+          )}
+          {!showChat && !showTrading && !rightSidebarCollapsed && (
+            <div
+              className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-20"
+              onClick={() => setRightSidebarCollapsed(true)}
+            />
+          )}
+
           {/* Collapsible Left Sidebar */}
           {!showChat && !showTrading && !leftSidebarCollapsed && (
-            <aside className="w-64 bg-neutral-950 border-r border-neutral-800 flex flex-col">
+            <aside className="w-64 bg-neutral-950 border-r border-neutral-800 flex flex-col md:relative absolute inset-y-0 left-0 z-30 md:z-auto md:block">
+              {/* Mobile Close Button */}
+              <div className="md:hidden flex justify-end p-2 border-b border-neutral-800">
+                <button
+                  onClick={() => setLeftSidebarCollapsed(true)}
+                  className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
+                >
+                  <IoClose size={16} />
+                </button>
+              </div>
+
               {/* Tab Headers */}
               <div className="flex border-b border-neutral-800">
                 <button className="flex-1 px-3 py-2 text-xs bg-neutral-800 text-white border-r border-neutral-700">
@@ -771,7 +787,17 @@ export default function App() {
 
           {/* Collapsible Right Sidebar */}
           {!showChat && !showTrading && !rightSidebarCollapsed && (
-            <aside className="w-72 bg-neutral-950 border-l border-neutral-800 flex flex-col">
+            <aside className="w-72 bg-neutral-950 border-l border-neutral-800 flex flex-col md:relative absolute inset-y-0 right-0 z-30 md:z-auto md:block">
+              {/* Mobile Close Button */}
+              <div className="md:hidden flex justify-end p-2 border-b border-neutral-800">
+                <button
+                  onClick={() => setRightSidebarCollapsed(true)}
+                  className="p-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded"
+                >
+                  <IoClose size={16} />
+                </button>
+              </div>
+
               {/* Tab Headers */}
               <div className="flex border-b border-neutral-800">
                 <button className="flex-1 px-3 py-2 text-xs bg-neutral-800 text-white border-r border-neutral-700">
@@ -927,27 +953,30 @@ export default function App() {
         </div>
 
         {/* Bottom Toolbar like TradingView */}
-        <footer className="bg-neutral-950 h-10 border-t border-neutral-800 flex items-center justify-between px-4">
+        <footer className="bg-neutral-950 h-10 border-t border-neutral-800 flex items-center justify-between px-2 md:px-4">
           {/* Left: Status and Stats */}
-          <div className="flex items-center space-x-6 text-xs">
-            <div className="flex items-center space-x-2">
-              <span className="text-neutral-400">Portfolio:</span>
+          <div className="flex items-center space-x-3 md:space-x-6 text-xs">
+            <div className="flex items-center space-x-1 md:space-x-2">
+              <span className="hidden sm:inline text-neutral-400">
+                Portfolio:
+              </span>
               <span className="text-white font-medium">
                 $
                 {portfolioValue.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
                 })}
               </span>
               <span className="text-emerald-400">+2.34%</span>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="hidden md:flex items-center space-x-2">
               <span className="text-neutral-400">Balance:</span>
               <span className="text-white">
                 ${(balance?.USDT || 0).toFixed(2)}
               </span>
             </div>
             {candles.length > 0 && (
-              <div className="flex items-center space-x-2">
+              <div className="hidden lg:flex items-center space-x-2">
                 <span className="text-neutral-400">Vol:</span>
                 <span className="text-white">
                   {(candles[candles.length - 1]?.volume || 0).toLocaleString()}
@@ -958,9 +987,9 @@ export default function App() {
 
           {/* Center: Data Status */}
           <div className="flex-1 flex justify-center">
-            <div className="flex items-center space-x-4 text-xs">
+            <div className="flex items-center space-x-2 md:space-x-4 text-xs">
               {chartData && (
-                <span className="text-neutral-400">
+                <span className="hidden md:inline text-neutral-400">
                   {chartData.length} candles loaded
                 </span>
               )}
