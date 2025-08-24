@@ -434,9 +434,14 @@ export default function App() {
           {/* Left: Logo + Symbol Search */}
           <div className="flex items-center space-x-3">
             {/* Logo placeholder */}
-            <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center text-black font-bold ">
+            {/* <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center text-black font-bold ">
               G
-            </div>
+            </div> */}
+            <img
+              src="/greenrock_logo.svg"
+              alt="Greenrock"
+              className="w-6 h-6"
+            />
 
             {/* Symbol Search */}
             <div className="flex items-center bg-neutral-950 rounded border-0 hover:border-neutral-600 px-3 py-1.5">

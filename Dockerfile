@@ -1,9 +1,12 @@
 FROM oven/bun:1 AS base
+
 WORKDIR /greenrock-web-ui
+
 COPY greenrock-web-ui/package.json .
 COPY greenrock-web-ui/bun.lock .
 
 FROM base AS install
+
 RUN mkdir -p /temp/dev
 COPY greenrock-web-ui/package.json greenrock-web-ui/bun.lock /temp/dev/
 RUN cd /temp/dev && bun install --frozen-lockfile
@@ -19,13 +22,6 @@ COPY greenrock-web-ui/ .
 ENV NODE_ENV=production
 # RUN bun test
 RUN bun run build
-
-# FROM base AS release
-# COPY --from=install /temp/prod/node_modules node_modules
-# COPY --from=prerelease /greenrock-web-ui/ .
-# COPY --from=prerelease /greenrock-web-ui/package.json .
-
-# CMD [ "bun", "run", "build" ]
 
 FROM rust:1.89
 
