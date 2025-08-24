@@ -1,4 +1,4 @@
-# 🌱 Greenrock
+# Greenrock
 
 **AI-Powered Quantitative Trading & Financial Analysis Platform**
 
