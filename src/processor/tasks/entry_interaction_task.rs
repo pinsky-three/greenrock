@@ -4,6 +4,7 @@ use graph_flow::GraphError::TaskExecutionFailed;
 use graph_flow::{Context, MessageRole, NextAction, Task, TaskResult};
 use rig::client::CompletionClient;
 use rig::completion::Chat;
+use rig::providers::openai;
 
 use rig::message::Message;
 use tracing::info;
@@ -31,7 +32,7 @@ pub fn get_llm_agent(
     // let f = a.extract("".to_string()).await.unwrap();
 
     let agent = client
-        .agent("google/gemini-2.0-flash-001")
+        .agent(openai::GPT_4O_MINI)
         .preamble(&system_prompt)
         .build();
 
