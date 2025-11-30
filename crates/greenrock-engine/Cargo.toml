@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 dotenvy = "0.15.7"
 graph-flow = { version = "0.2.3", features = ["rig"] }
-rig-core = "0.16.0"
+rig-core = "0.18.2"
 serde = { version = "1.0.219", features = ["derive"] }
 tokio = { version = "1.47.1", features = ["full"] }
 binance = { git = "https://github.com/wisespace-io/binance-rs.git" }
@@ -15,18 +15,18 @@ polars = { version = "0.50.0", features = ["lazy", "parquet"] }
 rust_decimal = { version = "1.37.2", features = ["macros"] }
 teloxide = { version = "0.17.0", features = ["macros"] }
 tracing = "0.1.41"
-anyhow = "1.0.98"
-async-trait = "0.1.88"
+anyhow = "1.0.99"
+async-trait = "0.1.89"
 axum = { version = "0.8.4", features = ["ws"] }
-uuid = { version = "1.17.0", features = ["v4"] }
+uuid = { version = "1.18.0", features = ["v4"] }
 tracing-subscriber = "0.3.19"
 askama = "0.14.0"
-serde_json = "1.0.142"
-tokio-tungstenite = { version = "0.24.0", features = [
+serde_json = "1.0.143"
+tokio-tungstenite = { version = "0.27.0", features = [
     "rustls-tls-native-roots",
 ] }
 futures-util = "0.3.31"
-tokio-util = { version = "0.7.12", features = ["rt"] }
+tokio-util = { version = "0.7.16", features = ["rt"] }
 ta = "0.5.0"
 tower-http = { version = "0.6.6", features = ["cors", "fs"] }
 tower = "0.5.2"

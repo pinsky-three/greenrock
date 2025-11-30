@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use binance::model::{Order, OrderBook, TradeHistory};
 use chrono::{DateTime, Duration, Utc};
 use polars::frame::DataFrame;
+use serde::Serialize;
 // use ta::{DataItem, Next, indicators::MovingAverageConvergenceDivergence};
 use tokio::signal;
 
@@ -11,15 +12,15 @@ use tracing::info;
 
 use crate::{
     brokers::{binance::BinanceBroker, core::Broker},
-    models::timeseries::{Candle, CandleRing},
-    strategy::core::{Strategy, StrategyAction, StrategyContext},
+    models::timeseries::{Candle, DataScopeRing},
+    strategy::core::{StateCalculation, Strategy, StrategyAction, StrategyContext},
 };
 
 pub struct Runner<State, B, S>
 where
     B: Broker + Send + Sync,
     S: Strategy<State = State> + Send + Sync,
-    State: Clone,
+    // State: Clone,
 {
     broker: B,
     strategy: S,
@@ -35,7 +36,7 @@ pub struct RunConfig {
 
 impl<State, B, S> Runner<State, B, S>
 where
-    State: Clone + Default,
+    State: Clone + Default + Serialize + StateCalculation<State>,
     B: Broker + Send + Sync,
     S: Strategy<State = State> + Send + Sync,
 {
@@ -71,6 +72,10 @@ where
         self.broker.market_current_price(symbol)
     }
 
+    pub fn indicators(&self) -> State {
+        self.strategy.state()
+    }
+
     pub async fn candles(
         &self,
         symbol: &str,
@@ -94,7 +99,6 @@ where
 
     pub async fn run_with_cancel_signal(
         &self,
-        mut init_state: State,
         config: &RunConfig,
         cancel: CancellationToken,
     ) -> StrategyContext {
@@ -103,7 +107,7 @@ where
             _trades: HashMap::new(),
         };
 
-        let (mut ctx, mut state) = self.strategy.init(&mut init_ctx, &mut init_state);
+        let (mut ctx, mut _state) = self.strategy.init(&mut init_ctx);
 
         let binance_broker = BinanceBroker::new();
 
@@ -121,10 +125,12 @@ where
             )
             .await;
 
-        let mut data_scope_ring = CandleRing::new(2000);
+        let mut data_scope_ring = DataScopeRing::<State>::new(2000);
 
-        for candle in data_scope {
-            data_scope_ring.upsert(candle);
+        let states = State::calculate_all(data_scope.clone());
+
+        for (candle, state) in data_scope.iter().zip(states) {
+            data_scope_ring.upsert((candle.clone(), state));
         }
 
         loop {
@@ -135,46 +141,37 @@ where
                 tick = candle_rx.recv() => {
                     match tick {
                         Ok(candle) => {
-                            // let di = DataItem::builder()
-                            //     .high(candle.high)
-                            //     .low(candle.low)
-                            //     .close(candle.close)
-                            //     .open(candle.open)
-                            //     .volume(candle.volume)
-                            //     // .timestamp(candle.timestamp)
-                            //     .build()
-                            //     .unwrap();
+                            // let macd = data_scope.macd(12, 26, 9);
+                            // let ema = data_scope.ema(20);
+                            // let st = data_scope.supertrend(10, 3.0);
 
-                            // let macd_res = macd.next(&di);
 
-                            // info!(
-                            //     "candle close={:.2} high={:.2} low={:.2} volume={:.3} macd={:.3}",
-                            //     candle.close,
-                            //     candle.high,
-                            //     candle.low,
-                            //     // candle.open,
-                            //     candle.volume,
-                            //     // candle.timestamp,
-                            //     macd_res.macd,
-                            // );
 
-                            // let mut ctx = StrategyContext {
-                            //     _data_scope: DataFrame::new(vec![]).unwrap(),
-                            //     _trades: HashMap::new(),
+                            // let state = IndicatorsForMinimalStrategy {
+                            //     macd: macd.macd,
+                            //     ema: ema,
+                            //     st: st.value,
+                            //     last_timestamp: candle.timestamp,
+                            //     last_trend: st.trend,
                             // };
 
+                            // Self::State::default();
+
+                            // let state = State::calculate_one(candle.clone());
+                            let state = State::next((candle.clone(), _state.clone()));
+                            // State::calculate_all()
+
                             // data_scope.push(candle.clone());
-                            data_scope_ring.upsert(candle.clone());
+                            data_scope_ring.upsert((candle.clone(), state));
 
                             let response = self
                                 .strategy
                                 .tick(
                                     &mut ctx,
                                     DateTime::from_timestamp(candle.timestamp, 0).unwrap(),
-                                    &mut state,
                                     config.symbol.to_string(),
                                     data_scope_ring.snapshot(),
-                                    candle,
+                                    (candle, _state.clone()),
                                 );
 
                             match response {
@@ -200,12 +197,12 @@ where
             }
         }
 
-        let (ctx, _state) = self.strategy.end(&mut ctx, &mut state);
+        let (ctx, _state) = self.strategy.end(&mut ctx);
 
         ctx
     }
 
-    pub async fn run_until_ctrl_c(&self, config: &RunConfig, state: State) -> StrategyContext {
+    pub async fn run_until_ctrl_c(&self, config: &RunConfig) -> StrategyContext {
         let cancel = CancellationToken::new();
         let cancel_clone = cancel.clone();
         tokio::spawn(async move {
@@ -213,6 +210,6 @@ where
             cancel_clone.cancel();
         });
 
-        self.run_with_cancel_signal(state, config, cancel).await
+        self.run_with_cancel_signal(config, cancel).await
     }
 }

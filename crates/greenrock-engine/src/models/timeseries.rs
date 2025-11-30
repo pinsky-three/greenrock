@@ -53,15 +53,21 @@ pub trait SymbolTrait {
 //     OneYear,
 // }
 
-pub struct CandleRing {
+pub struct DataScopeRing<State>
+where
+    State: Clone + Default + Serialize,
+{
     cap: usize,
-    buf: Vec<Option<Candle>>,             // fixed storage
+    buf: Vec<Option<(Candle, State)>>,    // fixed storage
     start: usize,                         // index of oldest
     len: usize,                           // number of valid items
     index: HashMap<DateTime<Utc>, usize>, // ts -> slot
 }
 
-impl CandleRing {
+impl<State> DataScopeRing<State>
+where
+    State: Clone + Default + Serialize,
+{
     pub fn new(cap: usize) -> Self {
         assert!(cap > 0);
         Self {
@@ -74,9 +80,9 @@ impl CandleRing {
     }
 
     /// Insert or update by timestamp. Overwrites oldest when at capacity.
-    pub fn upsert(&mut self, c: Candle) {
+    pub fn upsert(&mut self, (c, state): (Candle, State)) {
         if let Some(&slot) = self.index.get(&c.ts) {
-            self.buf[slot] = Some(c); // update in place
+            self.buf[slot] = Some((c, state)); // update in place
             return;
         }
 
@@ -90,23 +96,23 @@ impl CandleRing {
             let slot = self.start;
             // remove old index entry
             if let Some(old) = self.buf[slot].as_ref() {
-                self.index.remove(&old.ts);
+                self.index.remove(&old.0.ts);
             }
             self.start = (self.start + 1) % self.cap;
             slot
         };
 
         self.index.insert(c.ts, slot);
-        self.buf[slot] = Some(c);
+        self.buf[slot] = Some((c, state));
     }
 
-    pub fn get(&self, ts: DateTime<Utc>) -> Option<&Candle> {
+    pub fn get(&self, ts: DateTime<Utc>) -> Option<&(Candle, State)> {
         self.index
             .get(&ts)
             .and_then(|&slot| self.buf[slot].as_ref())
     }
 
-    pub fn last(&self) -> Option<&Candle> {
+    pub fn last(&self) -> Option<&(Candle, State)> {
         if self.len == 0 {
             return None;
         }
@@ -123,14 +129,14 @@ impl CandleRing {
     }
 
     /// Chronological iterator (oldest → newest).
-    pub fn iter(&self) -> impl Iterator<Item = &Candle> {
+    pub fn iter(&self) -> impl Iterator<Item = &(Candle, State)> {
         (0..self.len).filter_map(move |i| {
             let idx = (self.start + i) % self.cap;
             self.buf[idx].as_ref()
         })
     }
 
-    pub fn snapshot(&self) -> Vec<Candle> {
+    pub fn snapshot(&self) -> Vec<(Candle, State)> {
         self.iter().cloned().collect()
     }
 }

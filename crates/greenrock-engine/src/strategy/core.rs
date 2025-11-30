@@ -3,6 +3,8 @@ use std::{collections::HashMap, time::Instant};
 use chrono::{DateTime, Utc};
 use polars::frame::DataFrame;
 use rust_decimal::{Decimal, prelude::ToPrimitive};
+use serde::Serialize;
+use ta::{Next, indicators::ExponentialMovingAverage};
 // use ta::{DataItem, Next, indicators::MovingAverageConvergenceDivergence};
 use tracing::info;
 
@@ -47,38 +49,41 @@ pub struct StrategyContext {
 // }
 
 pub trait Strategy: Send + Sync {
-    type State: Clone + Default;
+    type State: Clone + Default + Serialize + StateCalculation<Self::State>;
 
     fn init(
         &self,
         ctx: &mut StrategyContext,
-        state: &mut Self::State,
+        // state: &mut Self::State,
     ) -> (StrategyContext, Self::State);
 
     fn end(
         &self,
         ctx: &mut StrategyContext,
-        state: &mut Self::State,
+        // state: &mut Self::State,
     ) -> (StrategyContext, Self::State);
 
     fn tick(
         &self,
         ctx: &mut StrategyContext,
         at: DateTime<Utc>,
-        state: &mut Self::State,
+        // state: &mut Self::State,
         symbol: String,
-        data_scope: Vec<Candle>,
-        tick: Candle,
+        data_scope: Vec<(Candle, Self::State)>,
+        tick: (Candle, Self::State),
     ) -> StrategyAction;
 
-    fn initial_state(&self) -> Self::State;
+    // fn initial_state(&self) -> Self::State;
 
     fn portfolio(&self) -> HashMap<String, f64>;
+
+    fn state(&self) -> Self::State;
 }
 
 #[derive(Clone)]
 pub struct MinimalStrategy {
     pub context: StrategyContext,
+    pub state: IndicatorsForMinimalStrategy,
 }
 
 impl MinimalStrategy {
@@ -88,6 +93,7 @@ impl MinimalStrategy {
                 _data_scope: data_scope,
                 _trades: HashMap::new(),
             },
+            state: IndicatorsForMinimalStrategy::default(),
         }
     }
 }
@@ -114,17 +120,77 @@ pub enum StrategyAction {
     Pass,
 }
 
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct IndicatorsForMinimalStrategy {
+    // pub macd: f64,
+    pub ema20: f64,
+    // pub st: f64,
+
+    // last_timestamp: i64,
+    // last_trend: f64,
+    #[serde(skip)]
+    ema20_calculator: ExponentialMovingAverage,
+}
+pub trait StateCalculation<State>
+where
+    State: Clone + Default + Serialize,
+{
+    // fn calculate_one(candle: Candle) -> State;
+    fn calculate_all(data_scope: Vec<Candle>) -> Vec<State>;
+    fn next(input: (Candle, State)) -> State;
+}
+
+impl StateCalculation<IndicatorsForMinimalStrategy> for IndicatorsForMinimalStrategy {
+    // fn calculate_one(candle: Candle) -> IndicatorsForMinimalStrategy {
+    //     IndicatorsForMinimalStrategy {
+    //         macd: 0.0,
+    //         ema: 0.0,
+    //         st: 0.0,
+    //         last_timestamp: candle.timestamp,
+    //         last_trend: 0.0,
+    //     }
+    // }
+
+    fn next(
+        (candle, mut _state): (Candle, IndicatorsForMinimalStrategy),
+    ) -> IndicatorsForMinimalStrategy {
+        // let mut ema20 = ExponentialMovingAverage::new(20).unwrap();
+        let ema20 = _state.ema20_calculator.next(candle.close);
+        IndicatorsForMinimalStrategy {
+            ema20,
+            ema20_calculator: _state.ema20_calculator,
+        }
+    }
+
+    fn calculate_all(candles: Vec<Candle>) -> Vec<IndicatorsForMinimalStrategy> {
+        // let macd = candles.macd(12, 26, 9);
+        // let ema = candles.ema(20);
+        // let st = candles.supertrend(10, 3.0);
+
+        let mut ema20 = ExponentialMovingAverage::new(20).unwrap();
+
+        let mut states = Vec::new();
+
+        for candle in candles {
+            states.push(IndicatorsForMinimalStrategy {
+                ema20: ema20.next(candle.close),
+                ema20_calculator: ema20.clone(),
+            });
+        }
+        states
+    }
+}
+
 impl Strategy for MinimalStrategy {
-    type State = HashMap<String, f64>;
+    type State = IndicatorsForMinimalStrategy; // HashMap<String, f64>;
 
     fn tick(
         &self,
         _ctx: &mut StrategyContext,
         timestamp: DateTime<Utc>,
-        state: &mut Self::State,
         symbol: String,
-        data_scope: Vec<Candle>,
-        tick: Candle,
+        data_scope: Vec<(Candle, Self::State)>,
+        tick: (Candle, Self::State),
     ) -> StrategyAction {
         let now = Instant::now();
         // let close = tick.close;
@@ -136,14 +202,11 @@ impl Strategy for MinimalStrategy {
         // info!("data_scope_len: {}", data_scope_len);
 
         // let macd = state.get("macd").unwrap_or(&0.0);
-        let macd = data_scope.macd(12, 26, 9);
-        state.insert("macd".to_string(), macd.macd);
+        // state.insert("macd".to_string(), macd.macd);
 
-        let ema = data_scope.ema(20);
-        state.insert("ema".to_string(), ema);
+        // state.insert("ema".to_string(), ema);
 
-        let st = data_scope.supertrend(10, 3.0);
-        state.insert("st".to_string(), st.trend as f64);
+        // state.insert("st".to_string(), st.trend as f64);
 
         // if macd.is_none() {
         //     let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap();
@@ -151,11 +214,15 @@ impl Strategy for MinimalStrategy {
         //     state.state.insert("macd".to_string(), macd.next(&di));
         // }
 
+        // self.state.macd = macd.macd;
+        // self.state.ema = ema;
+        // self.state.st = st.value;
+
         let duration = now.elapsed();
 
         info!(
-            "[{}] macd: {:.3}, ema: {:.3}, st: {:.3}, trend: {:?} (computed in {:?})",
-            tick.timestamp, macd.macd, ema, st.value, st.trend, duration,
+            "[{}] ema20: {} (computed in {:?})",
+            tick.0.timestamp, self.state.ema20, duration,
         );
 
         // match st.trend {
@@ -164,26 +231,25 @@ impl Strategy for MinimalStrategy {
         //     _ => StrategyAction::Pass,
         // }
 
-        let last_timestamp = state.get("last_timestamp").unwrap_or(&0_f64);
+        // let last_timestamp = self.state.last_timestamp;
 
-        let binding_trend = st.trend as f64;
-        let last_trend = state.get("last_trend").unwrap_or(&binding_trend);
+        // let last_trend = self.state.last_trend;
 
-        if st.trend == 1 && timestamp.timestamp() != last_timestamp.to_i64().unwrap() {
-            if last_trend == &(st.trend as f64) {
-                return StrategyAction::Pass;
-            }
+        // if st.trend == 1.0 && timestamp.timestamp() != last_timestamp.to_i64().unwrap() {
+        //     if last_trend == st.trend {
+        //         return StrategyAction::Pass;
+        //     }
 
-            state.insert("last_timestamp".to_string(), timestamp.timestamp() as f64);
-            state.insert("last_trend".to_string(), st.trend as f64);
+        //     // self.state.last_timestamp = timestamp.timestamp();
+        //     // self.state.last_trend = st.trend;
 
-            return StrategyAction::Emitted(Box::new(TradingAction {
-                id: "sell".to_string(),
-                timestamp,
-                symbol,
-                amount: 0.01,
-            }));
-        }
+        //     return StrategyAction::Emitted(Box::new(TradingAction {
+        //         id: "sell".to_string(),
+        //         timestamp,
+        //         symbol,
+        //         amount: 0.01,
+        //     }));
+        // }
 
         StrategyAction::Pass
     }
@@ -191,7 +257,7 @@ impl Strategy for MinimalStrategy {
     fn init(
         &self,
         ctx: &mut StrategyContext,
-        state: &mut Self::State,
+        // state: &mut Self::State,
     ) -> (StrategyContext, Self::State) {
         info!("init minimal strategy");
         // let mut macd = MovingAverageConvergenceDivergence::new(12, 26, 9).unwrap();
@@ -211,21 +277,21 @@ impl Strategy for MinimalStrategy {
 
         // state.insert("macd".to_string(), 0.33);
 
-        (ctx.clone(), state.clone())
+        (ctx.clone(), self.state.clone())
     }
 
     fn end(
         &self,
         ctx: &mut StrategyContext,
-        state: &mut Self::State,
+        // state: &mut Self::State,
     ) -> (StrategyContext, Self::State) {
         info!("end minimal strategy");
-        (ctx.clone(), state.clone())
+        (ctx.clone(), self.state.clone())
     }
 
-    fn initial_state(&self) -> Self::State {
-        Self::State::default()
-    }
+    // fn initial_state(&mut self) -> Self::State {
+    //     self.state.clone()
+    // }
 
     // hashmap of symbol and priority, priority is a number between 0 and 1
     fn portfolio(&self) -> HashMap<String, f64> {
@@ -236,5 +302,9 @@ impl Strategy for MinimalStrategy {
         portfolio.insert("SOLUSDT".to_string(), 0.2);
 
         portfolio
+    }
+
+    fn state(&self) -> Self::State {
+        self.state.clone()
     }
 }

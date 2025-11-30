@@ -20,7 +20,7 @@ use greenrock_engine::{
     models::timeseries::Candle,
     processor::tasks::entry_interaction_task::EntryInteractionTask,
     runner::core::{RunConfig, Runner},
-    strategy::core::{MinimalStrategy, Strategy},
+    strategy::core::{IndicatorsForMinimalStrategy, MinimalStrategy},
 };
 
 use serde_json::json;
@@ -40,7 +40,7 @@ use tower_http::services::ServeDir;
 struct AppState {
     flow_runner: Arc<FlowRunner>,
     session_storage: Arc<dyn SessionStorage>,
-    live_loop_runner: Arc<Runner<HashMap<String, f64>, BinanceBroker, MinimalStrategy>>,
+    live_loop_runner: Arc<Runner<IndicatorsForMinimalStrategy, BinanceBroker, MinimalStrategy>>,
     greenrock_session: Arc<GreenrockSession>,
 }
 
@@ -247,7 +247,7 @@ async fn get_candles(
         .candles(
             &params.symbol,
             &params.interval,
-            500,
+            1000,
             params
                 .start
                 .as_ref()
@@ -430,6 +430,15 @@ async fn handle_depth_socket_stream(mut socket: WebSocket, state: AppState) {
     }
 }
 
+async fn get_indicators(State(state): State<AppState>) -> Response {
+    let indicators = state.live_loop_runner.indicators();
+
+    Json(json!({
+        "indicators": indicators,
+    }))
+    .into_response()
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
@@ -456,7 +465,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let flow_runner = Arc::new(FlowRunner::new(graph.clone(), session_storage.clone()));
 
     let strategy = MinimalStrategy::new(DataFrame::new(vec![]).unwrap());
-    let initial_state = strategy.initial_state();
+    // let initial_state = strategy.initial_state();
 
     let binance_broker = BinanceBroker::default();
 
@@ -484,6 +493,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/chat", post(chat))
         //
         .route("/strategy/portfolio", get(get_portfolio))
+        .route("/strategy/indicators", get(get_indicators))
+        // .route("/strategy/indicators_stream", get(get_indicators_stream))
         //
         .route("/broker/balance", get(get_balance))
         .route("/broker/open_orders", get(get_open_orders))
@@ -492,7 +503,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/broker/candle_stream", get(get_candle_stream))
         .route("/broker/order_book", get(get_order_book))
         .route("/broker/order_book_stream", get(get_order_book_stream))
+        //
         .fallback_service(get_service(ServeDir::new("greenrock-web-ui/dist")))
+        //
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
 
@@ -509,13 +522,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let trading_runner_handle = tokio::spawn(async move {
         info!("Starting trading runner for BTCUSDT...");
         runner
-            .run_until_ctrl_c(
-                &RunConfig {
-                    symbol: "BTCUSDT".to_string(),
-                    interval: "1m".to_string(),
-                },
-                initial_state,
-            )
+            .run_until_ctrl_c(&RunConfig {
+                symbol: "BTCUSDT".to_string(),
+                interval: "1m".to_string(),
+            })
             .await;
     });
 

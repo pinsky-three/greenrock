@@ -40,7 +40,7 @@ pub struct SuperTrendOutput {
     pub upper: f64,
     pub lower: f64,
     pub value: f64,
-    pub trend: i32, // 1 for bullish, 0 for bearish
+    pub trend: f64, // 1 for bullish, 0 for bearish
     pub factor: f64,
 }
 
@@ -210,7 +210,7 @@ impl TechnicalAnalysis for Vec<Candle> {
                 upper: 0.0,
                 lower: 0.0,
                 value: 0.0,
-                trend: 0,
+                trend: 0.0,
                 factor,
             };
         }
@@ -225,16 +225,20 @@ impl TechnicalAnalysis for Vec<Candle> {
         // For simplicity, we'll implement a basic SuperTrend
         // In a full implementation, you'd need to maintain state across candles
         let trend = if close > basic_upper {
-            1
+            1.0
         } else if close < basic_lower {
-            0
+            0.0
         } else {
-            1
+            1.0
         };
 
         let final_upper = basic_upper;
         let final_lower = basic_lower;
-        let supertrend_value = if trend == 1 { final_lower } else { final_upper };
+        let supertrend_value = if trend == 1.0 {
+            final_lower
+        } else {
+            final_upper
+        };
 
         SuperTrendOutput {
             upper: final_upper,
