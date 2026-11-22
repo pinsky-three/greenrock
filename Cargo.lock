@@ -1129,6 +1129,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
+name = "fin-primitives"
+version = "4.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ea881ed57c18c5e839ac4ea0b0d91b3f9e499412e5957e4608ac9efa62c716b"
+dependencies = [
+ "chrono",
+ "libm",
+ "rust_decimal",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "flate2"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1382,6 +1394,7 @@ dependencies = [
  "binance",
  "chrono",
  "dotenvy",
+ "fin-primitives",
  "futures-util",
  "graph-flow",
  "polars",

@@ -1,8 +1,12 @@
+use fin_primitives::ta_compat::{
+    DataItem, Next as _,
+    indicators::{AverageTrueRange, RelativeStrengthIndex},
+};
 use ta::{
     Next,
     indicators::{
-        AverageTrueRange, ExponentialMovingAverage, MovingAverageConvergenceDivergence,
-        MovingAverageConvergenceDivergenceOutput, RelativeStrengthIndex,
+        ExponentialMovingAverage, MovingAverageConvergenceDivergence,
+        MovingAverageConvergenceDivergenceOutput,
     },
 };
 
@@ -140,11 +144,8 @@ impl TechnicalAnalysis for Vec<Candle> {
     fn rsi(&self, period: usize) -> f64 {
         let mut rsi = RelativeStrengthIndex::new(period).unwrap();
 
-        for candle in self.iter() {
-            rsi.next(candle.close);
-        }
-
-        rsi.next(self.last().unwrap().close)
+        self.iter()
+            .fold(f64::NAN, |_, candle| rsi.next(candle.close))
     }
 
     fn macd(
@@ -171,9 +172,9 @@ impl TechnicalAnalysis for Vec<Candle> {
 
         let mut atr = AverageTrueRange::new(period).unwrap();
 
-        for candle in self.iter() {
+        self.iter().fold(f64::NAN, |_, candle| {
             atr.next(
-                &ta::DataItem::builder()
+                &DataItem::builder()
                     .open(candle.open)
                     .high(candle.high)
                     .low(candle.low)
@@ -181,19 +182,8 @@ impl TechnicalAnalysis for Vec<Candle> {
                     .volume(candle.volume)
                     .build()
                     .unwrap(),
-            );
-        }
-
-        atr.next(
-            &ta::DataItem::builder()
-                .open(self.last().unwrap().open)
-                .high(self.last().unwrap().high)
-                .low(self.last().unwrap().low)
-                .close(self.last().unwrap().close)
-                .volume(self.last().unwrap().volume)
-                .build()
-                .unwrap(),
-        )
+            )
+        })
     }
 
     fn hl2(&self) -> f64 {
@@ -205,7 +195,7 @@ impl TechnicalAnalysis for Vec<Candle> {
     }
 
     fn supertrend(&self, atr_period: usize, factor: f64) -> SuperTrendOutput {
-        if self.len() < atr_period {
+        if self.len() <= atr_period {
             return SuperTrendOutput {
                 upper: 0.0,
                 lower: 0.0,
@@ -465,5 +455,43 @@ impl TechnicalAnalysis for Vec<Candle> {
         // Fallback to simple SuperTrend with mid-range factor
         let fallback_factor = (min_factor + max_factor) / 2.0;
         self.supertrend(atr_period, fallback_factor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn bars(hlc: &[(f64, f64, f64)]) -> Vec<Candle> {
+        hlc.iter()
+            .map(|&(high, low, close)| Candle {
+                open: close,
+                high,
+                low,
+                close,
+                volume: 0.0,
+                timestamp: 0,
+                ts: Utc::now(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn rsi_matches_talib_wilder() {
+        let closes = [
+            44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08, 45.89, 46.03,
+            45.61, 46.28, 46.28,
+        ];
+        let candles = bars(&closes.map(|c| (c, c, c)));
+        // TA-Lib RSI(14) on Wilder's reference series.
+        assert!((candles.rsi(14) - 70.464_135_021).abs() < 1e-6);
+    }
+
+    #[test]
+    fn atr_matches_talib_wilder() {
+        let candles = bars(&[(10.0, 8.0, 9.0), (11.0, 9.0, 10.0), (12.0, 8.0, 11.0)]);
+        // TA-Lib ATR(2): skip bar 0, mean of TR(1)=2 and TR(2)=4.
+        assert!((candles.atr(2) - 3.0).abs() < 1e-12);
     }
 }
